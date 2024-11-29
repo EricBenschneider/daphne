@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#include <runtime/local/io/FileMetaData.h>
 #include <runtime/local/io/ReadCsv.h>
 #include <runtime/local/io/utils.h>
 #include <fstream>
@@ -22,20 +21,19 @@
 #include <vector>
 #include <string>
 #include <type_traits>
+#include <limits>
 
 // Function to infer the data type of a string value
 ValueTypeCode inferValueType(const std::string &value) {
     if (value == "true" || value == "false") {
-        return ValueTypeCode::BOOLEAN;
+        return ValueTypeCode::STR;
+        //return ValueTypeCode::BOOLEAN; // TODO: introduce bool as ValueTypeCode
     }
     try {
-        int8_t si8 = std::stoi(value);
-        if (si8 >= INT8_MIN && si8 <= INT8_MAX) {
+        int intValue = std::stoi(value);
+        if (intValue >= std::numeric_limits<int8_t>::min() && intValue <= std::numeric_limits<int8_t>::max()) {
             return ValueTypeCode::SI8;
         }
-    } catch (...) {}
-    try {
-        std::stoi(value);
         return ValueTypeCode::SI32;
     } catch (...) {}
     try {
@@ -43,13 +41,10 @@ ValueTypeCode inferValueType(const std::string &value) {
         return ValueTypeCode::SI64;
     } catch (...) {}
     try {
-        uint8_t ui8 = std::stoul(value);
-        if (ui8 <= UINT8_MAX) {
+        unsigned int uintValue = std::stoul(value);
+        if (uintValue <= std::numeric_limits<uint8_t>::max()) {
             return ValueTypeCode::UI8;
         }
-    } catch (...) {}
-    try {
-        std::stoul(value);
         return ValueTypeCode::UI32;
     } catch (...) {}
     try {
