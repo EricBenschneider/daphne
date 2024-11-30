@@ -65,40 +65,52 @@ bool operator<(ValueTypeCode a, ValueTypeCode b) {
 
 // Function to infer the data type of string value
 ValueTypeCode inferValueType(const std::string &value) {
-    if (value == "true" || value == "false") {
-        return ValueTypeCode::STR;
-        //return ValueTypeCode::BOOLEAN; // TODO: introduce bool as ValueTypeCode
-    }
-    try {
-        int intValue = std::stoi(value);
-        if (intValue >= std::numeric_limits<int8_t>::min() && intValue <= std::numeric_limits<int8_t>::max()) {
-            return ValueTypeCode::SI8;
-        }
-        return ValueTypeCode::SI32;
-    } catch (...) {}
-    try {
-        std::stol(value);
-        return ValueTypeCode::SI64;
-    } catch (...) {}
-    try {
-        unsigned int uintValue = std::stoul(value);
+    // Check if the value can be parsed as a unsigned integer
+    std::istringstream iss(value);
+    uint64_t uintValue;
+    if (iss >> uintValue && iss.eof()) {
+        // Check the range of the unsigned integer to determine the appropriate type
         if (uintValue <= std::numeric_limits<uint8_t>::max()) {
             return ValueTypeCode::UI8;
+        } else if (uintValue <= std::numeric_limits<uint32_t>::max()) {
+            return ValueTypeCode::UI32;
+        } else {
+            return ValueTypeCode::UI64;
         }
-        return ValueTypeCode::UI32;
-    } catch (...) {}
-    try {
-        std::stoull(value);
-        return ValueTypeCode::UI64;
-    } catch (...) {}
-    try {
-        std::stof(value);
+    }
+
+    // Reset the stringstream and check if the value can be parsed as an signed integer
+    iss.clear();
+    iss.str(value);
+    int64_t intValue;
+    if (iss >> intValue && iss.eof()) {
+        // Check the range of the signed integer to determine the appropriate type
+        if (intValue >= std::numeric_limits<int8_t>::min() && intValue <= std::numeric_limits<int8_t>::max()) {
+            return ValueTypeCode::SI8;
+        } else if (intValue >= std::numeric_limits<int32_t>::min() && intValue <= std::numeric_limits<int32_t>::max()) {
+            return ValueTypeCode::SI32;
+        } else {
+            return ValueTypeCode::SI64;
+        }
+    }
+
+    // Reset the stringstream and check if the value can be parsed as a floating-point number
+    iss.clear();
+    iss.str(value);
+    float floatValue;
+    if (iss >> floatValue && iss.eof()) {
         return ValueTypeCode::F32;
-    } catch (...) {}
-    try {
-        std::stod(value);
+    }
+
+    // Reset the stringstream and check if the value can be parsed as a floating-point number
+    iss.clear();
+    iss.str(value);
+    double doubleValue;
+    if (iss >> doubleValue && iss.eof()) {
         return ValueTypeCode::F64;
-    } catch (...) {}
+    }
+
+    // If the value cannot be parsed as an integer or floating-point number, return INVALID
     if (value.length() == 16) {
         return ValueTypeCode::FIXEDSTR16;
     }
@@ -127,8 +139,13 @@ FileMetaData generateFileMetaData(const std::string &filename, bool optimized) {
             std::string value;
             size_t colIndex = 0;
             while (std::getline(ss, value, ',')) {
+                //trim any whitespaces for last element in line
+                // Remove any newline characters from the end of the value
+                if (!value.empty() && (value.back() == '\n' || value.back() == '\r')) {
+                    value.pop_back();
+                }
                 ValueTypeCode inferredType = inferValueType(value);
-                std::cout << "inferred valueType: " << static_cast<int>(inferredType) << ", " << value << std::endl;
+                std::cout << "inferred valueType: " << static_cast<int>(inferredType) << ", " << value << "." << std::endl;
                 // fill empty schema with inferred type
                 if (numCols <= colIndex) {
                     schema.push_back(inferredType);
