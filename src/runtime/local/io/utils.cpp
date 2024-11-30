@@ -23,7 +23,47 @@
 #include <type_traits>
 #include <limits>
 
-// Function to infer the data type of a string value
+bool isSameBaseType(const std::vector<ValueTypeCode>& schema) {
+    if (schema.empty()) return true;
+
+    auto isFloatType = [](ValueTypeCode type) {
+        return type == ValueTypeCode::F32 || type == ValueTypeCode::F64;
+    };
+
+    auto isIntType = [](ValueTypeCode type) {
+        return type == ValueTypeCode::SI8 || type == ValueTypeCode::SI32 || type == ValueTypeCode::SI64 ||
+               type == ValueTypeCode::UI8 || type == ValueTypeCode::UI32 || type == ValueTypeCode::UI64;
+    };
+
+    bool allFloat = std::all_of(schema.begin(), schema.end(), isFloatType);
+    bool allInt = std::all_of(schema.begin(), schema.end(), isIntType);
+
+    return allFloat || allInt;
+}
+
+bool operator<(ValueTypeCode a, ValueTypeCode b) {
+    // Define the order of ValueTypeCode
+    static const std::vector<ValueTypeCode> order = {
+            ValueTypeCode::UI8,
+            ValueTypeCode::SI8,
+            ValueTypeCode::UI32,
+            ValueTypeCode::SI32,
+            ValueTypeCode::UI64,
+            ValueTypeCode::SI64,
+            ValueTypeCode::F32,
+            ValueTypeCode::F64,
+            ValueTypeCode::FIXEDSTR16,
+            ValueTypeCode::STR,
+            ValueTypeCode::INVALID
+    };
+
+    auto itA = std::find(order.begin(), order.end(), a);
+    auto itB = std::find(order.begin(), order.end(), b);
+
+    return itA < itB;
+}
+
+// Function to infer the data type of string value
 ValueTypeCode inferValueType(const std::string &value) {
     if (value == "true" || value == "false") {
         return ValueTypeCode::STR;
@@ -66,7 +106,7 @@ ValueTypeCode inferValueType(const std::string &value) {
 }
 
 // Function to read the CSV file and determine the FileMetaData
-FileMetaData generateFileMetaData(const std::string &filename) {
+FileMetaData generateFileMetaData(const std::string &filename, bool optimized) {
     std::ifstream file(filename);
     std::string line;
     std::vector<ValueTypeCode> schema;
@@ -74,18 +114,12 @@ FileMetaData generateFileMetaData(const std::string &filename) {
     size_t numRows = 0;
     size_t numCols = 0;
     bool isSingleValueType = true;
-    ValueTypeCode firstColumnType = ValueTypeCode::INVALID;
+    // set the default value type to the most specific value type
+    ValueTypeCode maxValueType = ValueTypeCode::UI8;
+    ValueTypeCode currentType = ValueTypeCode::INVALID;
 
     if (file.is_open()) {
-        // Read the first line to get the column labels
-        if (std::getline(file, line)) {
-            std::stringstream ss(line);
-            std::string label;
-            while (std::getline(ss, label, ',')) {
-                labels.push_back(label);
-            }
-            numCols = labels.size();
-        }
+        // TODO: get column labels if any
 
         // Read the rest of the file to infer the schema
         while (std::getline(file, line)) {
@@ -94,25 +128,45 @@ FileMetaData generateFileMetaData(const std::string &filename) {
             size_t colIndex = 0;
             while (std::getline(ss, value, ',')) {
                 ValueTypeCode inferredType = inferValueType(value);
-                //if (numRows == 0) { // TODO: check if first row differs from rest
+                std::cout << "inferred valueType: " << static_cast<int>(inferredType) << ", " << value << std::endl;
+                // fill empty schema with inferred type
+                if (numCols <= colIndex) {
                     schema.push_back(inferredType);
-                    if (colIndex == 0) {
-                        firstColumnType = inferredType;
-                    } else if (inferredType != firstColumnType) {
-                        isSingleValueType = false;
-                    }
-                /*} else {
-                    if (schema[colIndex] != inferredType) {
-                        schema[colIndex] = ValueTypeCode::STR;
-                        isSingleValueType = false;
-                    }
-                }*/
+                }
+                currentType = schema[colIndex];
+                //update the current type if the inferred type is more specific
+                if (currentType < inferredType) {
+                    currentType = inferredType;
+                    schema[colIndex]= currentType;
+                }
+                if (maxValueType < currentType) {
+                    maxValueType = currentType;
+                }
                 colIndex++;
             }
+            numCols = std::max(numCols, colIndex);
             numRows++;
         }
         file.close();
+    }else {
+        std::cerr << "Unable to open file: " << filename << std::endl;
     }
 
+    std::cout << "Generated valueType from CSV file: " << static_cast<int>(currentType) << std::endl;
+    std::cout << "Max valueType from CSV file: " << static_cast<int>(maxValueType) << std::endl;
+    if (optimized) {
+        for (const auto &typeCode : schema){
+            if (typeCode != currentType){
+                isSingleValueType = false;
+                break;
+            }
+        }
+    }else {
+        isSingleValueType = isSameBaseType(schema);
+    }
+    if (isSingleValueType) {
+        schema.clear();
+        schema.push_back(maxValueType);
+    }
     return FileMetaData(numRows, numCols, isSingleValueType, schema, labels);
 }
