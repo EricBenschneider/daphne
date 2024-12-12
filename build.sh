@@ -1106,7 +1106,7 @@ fi
 #******************************************************************************
 
 daphne_msg "Build Daphne"
-
+echo $installPrefix $sourcePrefix $buildPrefix $thirdpartyPath $projectRoot $antlrVersion
 cmake -S "$projectRoot" -B "$daphneBuildDir" -G Ninja -DANTLR_VERSION="$antlrVersion" \
     -DCMAKE_PREFIX_PATH="$installPrefix" \
     $BUILD_CUDA $BUILD_FPGAOPENCL $BUILD_DEBUG $BUILD_MPI $BUILD_HDFS $BUILD_PAPI

@@ -1,0 +1,10 @@
+# .dockerignore
+.git
+.gitignore
+*.log
+*.tmp
+node_modules
+build
+cmake-build-debug
+cmake-build-release
+thirdparty

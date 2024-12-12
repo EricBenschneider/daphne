@@ -26,8 +26,8 @@ if [[ "$(arch)" == arm*  ]] || [ $(arch) == 'aarch64' ]; then
 fi
 
 #on some installations docker can only be run with sudo
-USE_SUDO=
-#USE_SUDO=sudo
+#USE_SUDO=
+USE_SUDO=sudo
 
 # run this script from the base path of your DAPHNE source tree
 DAPHNE_ROOT=$PWD
@@ -60,15 +60,16 @@ if [ "$#" -eq 0 ]; then
 fi
 
 # non-interactive: launch with PWD mounted
-#docker run $DEVICE_FLAGS --user=$UID:$GID --rm -w "$DAPHNE_ROOT" -v "$DAPHNE_ROOT:$DAPHNE_ROOT" \
+#$USE_SUDO docker run $DEVICE_FLAGS --user=$UID:$GID -d --rm -w "$DAPHNE_ROOT" -v "$DAPHNE_ROOT:$DAPHNE_ROOT" \
 #    -e TERM=screen-256color -e PATH="$PATH" -e LD_LIBRARY_PATH="$LD_LIBRARY_PATH" -e USER=$USERNAME -e UID=$UID \
-#    "$DOCKER_IMAGE:$DOCKER_TAG" $@
+#   "$DOCKER_IMAGE:$DOCKER_TAG" $@
 
 # for interactive use:
 $USE_SUDO docker run $DEBUG_FLAGS $DEVICE_FLAGS -it --rm --hostname daphne-container -w $DAPHNE_ROOT_CONTAINER \
     -v "$DAPHNE_ROOT:$DAPHNE_ROOT_CONTAINER" -e GID=$GID -e TERM=screen-256color -e PATH -e LD_LIBRARY_PATH \
-    -e USER=$USERNAME -e UID=$UID \
-    "$DOCKER_IMAGE:$DOCKER_TAG" $command
+    -e USER=$USERNAME -e UID=$UID -p 22222:22 \
+    --entrypoint $DAPHNE_ROOT/containers/entrypoint-interactive.sh \
+      "$DOCKER_IMAGE:$DOCKER_TAG" $command # "$DOCKER_IMAGE:$DOCKER_TAG" $command
 
 # move this up to above the DOCKER_IMAGE line to override the entrypoint:
 #    --entrypoint /daphne/containers/entrypoint-interactive.sh
