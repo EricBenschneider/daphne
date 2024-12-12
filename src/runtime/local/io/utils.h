@@ -29,7 +29,7 @@
 ValueTypeCode inferValueType(const std::string &value);
 
 // Function to read the CSV file and determine the FileMetaData
-FileMetaData generateFileMetaData(const std::string &filename, bool optimized = false);
+FileMetaData generateFileMetaData(const std::string &filename, bool isMatrix = false);
 
 
 // Conversion of std::string.

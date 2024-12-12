@@ -20,7 +20,6 @@
 #include <sstream>
 #include <vector>
 #include <string>
-#include <type_traits>
 #include <limits>
 
 bool isSameBaseType(const std::vector<ValueTypeCode>& schema) {
@@ -41,26 +40,27 @@ bool isSameBaseType(const std::vector<ValueTypeCode>& schema) {
     return allFloat || allInt;
 }
 
-bool operator<(ValueTypeCode a, ValueTypeCode b) {
-    // Define the order of ValueTypeCode
-    static const std::vector<ValueTypeCode> order = {
-            ValueTypeCode::UI8,
-            ValueTypeCode::SI8,
-            ValueTypeCode::UI32,
-            ValueTypeCode::SI32,
-            ValueTypeCode::UI64,
-            ValueTypeCode::SI64,
-            ValueTypeCode::F32,
-            ValueTypeCode::F64,
-            ValueTypeCode::FIXEDSTR16,
-            ValueTypeCode::STR,
-            ValueTypeCode::INVALID
-    };
-
-    auto itA = std::find(order.begin(), order.end(), a);
-    auto itB = std::find(order.begin(), order.end(), b);
-
-    return itA < itB;
+int generality(ValueTypeCode type) {
+    switch (type) {
+        case ValueTypeCode::UI8:
+            return 0;
+        case ValueTypeCode::SI8:
+            return 1;
+        case ValueTypeCode::UI32:
+            return 2;
+        case ValueTypeCode::SI32:
+            return 3;
+        case ValueTypeCode::UI64:
+            return 4;
+        case ValueTypeCode::SI64:
+            return 5;
+        case ValueTypeCode::F32:
+            return 6;
+        case ValueTypeCode::F64:
+            return 7;
+        default: // ValueTypeCode::STR, ValueTypeCode::FIXEDSTR16
+            return 8;
+    }
 }
 
 // Function to infer the data type of string value
@@ -110,15 +110,11 @@ ValueTypeCode inferValueType(const std::string &value) {
         return ValueTypeCode::F64;
     }
 
-    // If the value cannot be parsed as an integer or floating-point number, return INVALID
-    if (value.length() == 16) {
-        return ValueTypeCode::FIXEDSTR16;
-    }
     return ValueTypeCode::STR;
 }
 
 // Function to read the CSV file and determine the FileMetaData
-FileMetaData generateFileMetaData(const std::string &filename, bool optimized) {
+FileMetaData generateFileMetaData(const std::string &filename, bool isMatrix) {
     std::ifstream file(filename);
     std::string line;
     std::vector<ValueTypeCode> schema;
@@ -152,11 +148,11 @@ FileMetaData generateFileMetaData(const std::string &filename, bool optimized) {
                 }
                 currentType = schema[colIndex];
                 //update the current type if the inferred type is more specific
-                if (currentType < inferredType) {
+                if (generality(currentType) < generality(inferredType)) {
                     currentType = inferredType;
                     schema[colIndex]= currentType;
                 }
-                if (maxValueType < currentType) {
+                if (generality(maxValueType) < generality(currentType)) {
                     maxValueType = currentType;
                 }
                 colIndex++;
@@ -171,15 +167,16 @@ FileMetaData generateFileMetaData(const std::string &filename, bool optimized) {
 
     std::cout << "Generated valueType from CSV file: " << static_cast<int>(currentType) << std::endl;
     std::cout << "Max valueType from CSV file: " << static_cast<int>(maxValueType) << std::endl;
-    if (optimized) {
+    if (isMatrix) {
+        isSingleValueType = isSameBaseType(schema);
+    }else {
+        //check if all columns are from same valueType
         for (const auto &typeCode : schema){
             if (typeCode != currentType){
                 isSingleValueType = false;
                 break;
             }
         }
-    }else {
-        isSingleValueType = isSameBaseType(schema);
     }
     if (isSingleValueType) {
         schema.clear();
