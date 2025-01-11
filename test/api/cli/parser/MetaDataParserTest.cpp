@@ -28,6 +28,12 @@
 
 const std::string dirPath = "test/api/cli/parser/metadataFiles/";
 
+//TODO: add tests:
+// CSV:
+// no metadata -> generate metadata = metadata
+// check for added generatedMetaDataFile
+
+
 TEST_CASE("Proper meta data file for Matrix", TAG_PARSER) {
     const std::string metaDataFile = dirPath + "MetaData1";
     REQUIRE_NOTHROW(MetaDataParser::readMetaData(metaDataFile));

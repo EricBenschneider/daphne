@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-#include <runtime/local/io/ReadCsv.h>
+//#include <runtime/local/io/ReadCsv.h>
 #include <runtime/local/io/utils.h>
 #include <fstream>
 #include <sstream>
 #include <vector>
 #include <string>
 #include <limits>
+#include <iostream>
 
 bool isSameBaseType(const std::vector<ValueTypeCode>& schema) {
     if (schema.empty()) return true;
@@ -114,7 +115,7 @@ ValueTypeCode inferValueType(const std::string &value) {
 }
 
 // Function to read the CSV file and determine the FileMetaData
-FileMetaData generateFileMetaData(const std::string &filename, bool isMatrix) {
+FileMetaData generateFileMetaData(const std::string &filename, bool hasLabels) {
     std::ifstream file(filename);
     std::string line;
     std::vector<ValueTypeCode> schema;
@@ -128,7 +129,16 @@ FileMetaData generateFileMetaData(const std::string &filename, bool isMatrix) {
 
     if (file.is_open()) {
         // TODO: get column labels if any
-
+        if(hasLabels){
+            //extract labels from first line
+            if (std::getline(file, line)) {
+                std::stringstream ss(line);
+                std::string label;
+                while (std::getline(ss, label, ',')) {
+                    labels.push_back(label);
+                }
+            }
+        }
         // Read the rest of the file to infer the schema
         while (std::getline(file, line)) {
             std::stringstream ss(line);
@@ -167,20 +177,19 @@ FileMetaData generateFileMetaData(const std::string &filename, bool isMatrix) {
 
     std::cout << "Generated valueType from CSV file: " << static_cast<int>(currentType) << std::endl;
     std::cout << "Max valueType from CSV file: " << static_cast<int>(maxValueType) << std::endl;
-    if (isMatrix) {
-        isSingleValueType = isSameBaseType(schema);
-    }else {
-        //check if all columns are from same valueType
-        for (const auto &typeCode : schema){
-            if (typeCode != currentType){
-                isSingleValueType = false;
-                break;
-            }
+
+    //check if all columns are from same valueType
+    for (const auto &typeCode : schema){
+        if (typeCode != currentType){
+            isSingleValueType = false;
+            break;
         }
     }
-    if (isSingleValueType) {
-        schema.clear();
-        schema.push_back(maxValueType);
+
+    if (isSingleValueType && !hasLabels){
+            schema.clear();
+            schema.push_back(maxValueType);
     }
+
     return FileMetaData(numRows, numCols, isSingleValueType, schema, labels);
 }

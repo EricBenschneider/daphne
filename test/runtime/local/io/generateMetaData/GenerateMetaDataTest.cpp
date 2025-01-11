@@ -16,7 +16,7 @@ TEST_CASE("generated metadata matches saved metadata", "[metadata]") {
         FileMetaData readMetaData = MetaDataParser::readMetaData(csvFilename);
 
         // Generate metadata from CSV file
-        FileMetaData generatedMetaData = generateFileMetaData(csvFilename);
+        FileMetaData generatedMetaData = generateFileMetaData(csvFilename, false);
 
         // Check if the generated metadata matches the read metadata
         REQUIRE(generatedMetaData.numRows == readMetaData.numRows);
