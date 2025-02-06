@@ -291,7 +291,7 @@ template <typename VT> struct ReadCsvFile<CSRMatrix<VT>> {
 // ----------------------------------------------------------------------------
 // Frame
 // ----------------------------------------------------------------------------
-
+// Updated optimized branch in ReadCsvFile<Frame>::apply to reposition file pointer and load file->line.
 template <> struct ReadCsvFile<Frame> {
     static void apply(Frame *&res, struct File *file, size_t numRows, size_t numCols, char delim,
                       ValueTypeCode *schema, const char *filename, bool optimized = false) {
@@ -313,115 +313,95 @@ template <> struct ReadCsvFile<Frame> {
             rawCols[i] = reinterpret_cast<uint8_t *>(res->getColumnRaw(i));
             colTypes[i] = res->getColumnType(i);
         }
-        //use posMap if exists
-        if (optimized && std::filesystem::exists(filename + ext)){
+        // Use posMap if exists
+        if (optimized && std::filesystem::exists(std::string(filename) + ext)) {
             std::cout << "try reading posMap file" << std::endl;
-                std::vector<std::vector<std::streampos>> posMap = readPositionalMap(filename, numCols);
-                std::cout << "doing optimized parsing using posMap" << numCols << numRows
-                                      <<  posMap.size()  << posMap[0].size()                         << std::endl;
+            std::vector<std::vector<std::streampos>> posMap = readPositionalMap(filename, numCols);
+            std::cout << "doing optimized parsing using posMap, numCols: " << numCols
+                      << " numRows: " << numRows << " posMap size: "
+                      << posMap.size() << ", row size: " << (posMap.empty() ? 0 : posMap[0].size()) << std::endl;
+            for (size_t j = 0; j < numRows; j++) {
                 for (size_t i = 0; i < numCols; i++) {
-                    for (size_t j = 0; j < numRows; j++) {
-                        std::cout << "row: " << j << " col: " << i << " pos: " << file->pos << std::endl;
-                        std::cout << "col enum type" << static_cast<int>(colTypes[i]) << std::endl;
 
-                        if (j >= posMap[i].size()) {
-                            throw std::runtime_error("Invalid position in posMap: row " + std::to_string(j) + " col " + std::to_string(i));
-                        }
-                        file->pos = posMap[i][j];
-                        std::cout << "pos: " << file->pos << std::endl;
-                        if (file->pos < 0) {
-                            throw std::runtime_error("Invalid position in posMap");
-                        }
-                        if (file->read == EOF){
-                            std::cout << "EOF" << std::endl; break;}
-                        if (file->line == NULL){
-                                std::cout << "line is NULL" << std::endl;
-                            break;}
-                        if (file->pos < 0) {
-                            throw std::runtime_error("Invalid position in posMap");
-                        }
-                        if (fseek(file->identifier, file->pos, SEEK_SET) != 0) {
-                            throw std::runtime_error("Failed to seek to position in file");
-                        }
-                        if (getFileLine(file) == -1) {
-                            throw std::runtime_error("ReadCsvFile::apply: getFileLine failed");
-                        }
-                        size_t pos = 0;
-                        switch (colTypes[i]) {
-                        case ValueTypeCode::SI8:
-                            std::cout << "type: " << static_cast<int>(ValueTypeCode::SI8) << "actual: " << static_cast<int>(colTypes[i]) << std::endl;
-                            int8_t val_si8;
-                            convertCstr(file->line + pos, &val_si8);
-                            reinterpret_cast<int8_t *>(rawCols[i])[j] = val_si8;
-                            break;
-                        case ValueTypeCode::SI32:
-                            std::cout << "type: " << static_cast<int>(ValueTypeCode::SI32) << "actual: " << static_cast<int>(colTypes[i]) << std::endl;
-                            int32_t val_si32;
-                            convertCstr(file->line + pos, &val_si32);
-                            reinterpret_cast<int32_t *>(rawCols[i])[j] = val_si32;
-                            break;
-                        case ValueTypeCode::SI64:
-                            std::cout << "type: " << static_cast<int>(ValueTypeCode::SI64) << "actual: " << static_cast<int>(colTypes[i]) << std::endl;
-                            int64_t val_si64;
-                            convertCstr(file->line + pos, &val_si64);
-                            reinterpret_cast<int64_t *>(rawCols[i])[j] = val_si64;
-                            break;
-                        case ValueTypeCode::UI8:
-                            std::cout << "type: " << static_cast<int>(ValueTypeCode::UI8) << "actual: " << static_cast<int>(colTypes[i]) << std::endl;
-                            uint8_t val_ui8;
-                            convertCstr(file->line + pos, &val_ui8);
-                            reinterpret_cast<uint8_t *>(rawCols[i])[j] = val_ui8;
-                            break;
-                        case ValueTypeCode::UI32:
-                            std::cout << "type: " << static_cast<int>(ValueTypeCode::UI32) << "actual: " << static_cast<int>(colTypes[i]) << std::endl;
-                            uint32_t val_ui32;
-                            convertCstr(file->line + pos, &val_ui32);
-                            reinterpret_cast<uint32_t *>(rawCols[i])[j] = val_ui32;
-                            break;
-                        case ValueTypeCode::UI64:
-                            std::cout  << "type: " << static_cast<int>(ValueTypeCode::UI64) << "actual: " << static_cast<int>(colTypes[i]) << std::endl;
-                            uint64_t val_ui64;
-                            convertCstr(file->line + pos, &val_ui64);
-                            reinterpret_cast<uint64_t *>(rawCols[i])[j] = val_ui64;
-                            break;
-                        case ValueTypeCode::F32:
-                            std::cout << "type: " << static_cast<int>(ValueTypeCode::F32) << "actual: " << static_cast<int>(colTypes[i]) << std::endl;
-                            float val_f32;
-                            convertCstr(file->line + pos, &val_f32);
-                            reinterpret_cast<float *>(rawCols[i])[j] = val_f32;
-                            break;
-                        case ValueTypeCode::F64:
-                            std::cout << "type: " << static_cast<int>(ValueTypeCode::F64) << "actual: " << static_cast<int>(colTypes[i]) << std::endl;
-                            double val_f64;
-                            convertCstr(file->line + pos, &val_f64);
-                            reinterpret_cast<double *>(rawCols[i])[j] = val_f64;
-                            break;
-                        case ValueTypeCode::STR: {
-                            std::cout << "type: " << static_cast<int>(ValueTypeCode::STR) << "actual: " << static_cast<int>(colTypes[i]) << std::endl;
-                            std::string val_str = "";
-                            pos = setCString(file, pos, &val_str, delim);
-                            reinterpret_cast<std::string *>(rawCols[i])[j] = val_str;
-                            break;
-                        }
-                        case ValueTypeCode::FIXEDSTR16: {
-                            std::cout << "type: " << static_cast<int>(ValueTypeCode::FIXEDSTR16) << "actual: " << static_cast<int>(colTypes[i]) << std::endl;
-                            std::string val_str = "";
-                            pos = setCString(file, pos, &val_str, delim);
-                            reinterpret_cast<FixedStr16 *>(rawCols[i])[j] = FixedStr16(val_str);
-                            break;
-                        }
-                        default:
-                            throw std::runtime_error("ReadCsvFile::apply: unknown value type code");
-                        }
+                    file->pos = posMap[j][i];
+                    if (fseek(file->identifier, file->pos, SEEK_SET) != 0)
+                        throw std::runtime_error("Failed to seek to position in file");
+                    if(getFileLine(file) == -1)
+                        //throw std::runtime_error("Optimized branch: getFileLine failed");
+                    std::cout << "row: " << j << " col: " << i << " pos: " << file->pos << std::endl;
+                    size_t pos = 0;
+                    switch (colTypes[i]) {
+                    case ValueTypeCode::SI8: {
+                        int8_t val_si8;
+                        convertCstr(file->line + pos, &val_si8);
+                        reinterpret_cast<int8_t *>(rawCols[i])[j] = val_si8;
+                        break;
+                    }
+                    case ValueTypeCode::SI32: {
+                        int32_t val_si32;
+                        convertCstr(file->line + pos, &val_si32);
+                        reinterpret_cast<int32_t *>(rawCols[i])[j] = val_si32;
+                        break;
+                    }
+                    case ValueTypeCode::SI64: {
+                        int64_t val_si64;
+                        convertCstr(file->line + pos, &val_si64);
+                        reinterpret_cast<int64_t *>(rawCols[i])[j] = val_si64;
+                        break;
+                    }
+                    case ValueTypeCode::UI8: {
+                        uint8_t val_ui8;
+                        convertCstr(file->line + pos, &val_ui8);
+                        reinterpret_cast<uint8_t *>(rawCols[i])[j] = val_ui8;
+                        break;
+                    }
+                    case ValueTypeCode::UI32: {
+                        uint32_t val_ui32;
+                        convertCstr(file->line + pos, &val_ui32);
+                        reinterpret_cast<uint32_t *>(rawCols[i])[j] = val_ui32;
+                        break;
+                    }
+                    case ValueTypeCode::UI64: {
+                        uint64_t val_ui64;
+                        convertCstr(file->line + pos, &val_ui64);
+                        reinterpret_cast<uint64_t *>(rawCols[i])[j] = val_ui64;
+                        break;
+                    }
+                    case ValueTypeCode::F32: {
+                        float val_f32;
+                        convertCstr(file->line + pos, &val_f32);
+                        reinterpret_cast<float *>(rawCols[i])[j] = val_f32;
+                        break;
+                    }
+                    case ValueTypeCode::F64: {
+                        double val_f64;
+                        convertCstr(file->line + pos, &val_f64);
+                        reinterpret_cast<double *>(rawCols[i])[j] = val_f64;
+                        break;
+                    }
+                    case ValueTypeCode::STR: {
+                        std::string val_str = "";
+                        pos = setCString(file, pos, &val_str, delim);
+                        reinterpret_cast<std::string *>(rawCols[i])[j] = val_str;
+                        break;
+                    }
+                    case ValueTypeCode::FIXEDSTR16: {
+                        std::string val_str = "";
+                        pos = setCString(file, pos, &val_str, delim);
+                        reinterpret_cast<FixedStr16 *>(rawCols[i])[j] = FixedStr16(val_str);
+                        break;
+                    }
+                    default:
+                        throw std::runtime_error("ReadCsvFile::apply: unknown value type code");
                     }
                 }
-                std::cout << "saving posMap file" << std::endl;
-        }else {
-
+            }
+            std::cout << "saving posMap file" << std::endl;
+        } else {
             std::vector<std::vector<std::streampos>> posMap(numCols);
             std::streampos currentPos = 0;
 
-            while (1) {
+            while (true) {
                 ssize_t ret = getFileLine(file);
                 if (file->read == EOF)
                     break;
@@ -431,53 +411,59 @@ template <> struct ReadCsvFile<Frame> {
                     throw std::runtime_error("ReadCsvFile::apply: getFileLine failed");
                 std::cout << "doing normal parsing saving posMap" << std::endl;
                 size_t pos = 0;
-                while (1) {
-                 //   std::cout << "row: " << row << " col: " << col << std::endl;
+                for (col = 0; col < numCols; col++) {
                     if (optimized) {
                         posMap[col].push_back(currentPos + static_cast<std::streamoff>(pos));
                     }
-
                     switch (colTypes[col]) {
-                    case ValueTypeCode::SI8:
+                    case ValueTypeCode::SI8: {
                         int8_t val_si8;
                         convertCstr(file->line + pos, &val_si8);
                         reinterpret_cast<int8_t *>(rawCols[col])[row] = val_si8;
                         break;
-                    case ValueTypeCode::SI32:
+                    }
+                    case ValueTypeCode::SI32: {
                         int32_t val_si32;
                         convertCstr(file->line + pos, &val_si32);
                         reinterpret_cast<int32_t *>(rawCols[col])[row] = val_si32;
                         break;
-                    case ValueTypeCode::SI64:
+                    }
+                    case ValueTypeCode::SI64: {
                         int64_t val_si64;
                         convertCstr(file->line + pos, &val_si64);
                         reinterpret_cast<int64_t *>(rawCols[col])[row] = val_si64;
                         break;
-                    case ValueTypeCode::UI8:
+                    }
+                    case ValueTypeCode::UI8: {
                         uint8_t val_ui8;
                         convertCstr(file->line + pos, &val_ui8);
                         reinterpret_cast<uint8_t *>(rawCols[col])[row] = val_ui8;
                         break;
-                    case ValueTypeCode::UI32:
+                    }
+                    case ValueTypeCode::UI32: {
                         uint32_t val_ui32;
                         convertCstr(file->line + pos, &val_ui32);
                         reinterpret_cast<uint32_t *>(rawCols[col])[row] = val_ui32;
                         break;
-                    case ValueTypeCode::UI64:
+                    }
+                    case ValueTypeCode::UI64: {
                         uint64_t val_ui64;
                         convertCstr(file->line + pos, &val_ui64);
                         reinterpret_cast<uint64_t *>(rawCols[col])[row] = val_ui64;
                         break;
-                    case ValueTypeCode::F32:
+                    }
+                    case ValueTypeCode::F32: {
                         float val_f32;
                         convertCstr(file->line + pos, &val_f32);
                         reinterpret_cast<float *>(rawCols[col])[row] = val_f32;
                         break;
-                    case ValueTypeCode::F64:
+                    }
+                    case ValueTypeCode::F64: {
                         double val_f64;
                         convertCstr(file->line + pos, &val_f64);
                         reinterpret_cast<double *>(rawCols[col])[row] = val_f64;
                         break;
+                    }
                     case ValueTypeCode::STR: {
                         std::string val_str = "";
                         pos = setCString(file, pos, &val_str, delim);
@@ -493,31 +479,18 @@ template <> struct ReadCsvFile<Frame> {
                     default:
                         throw std::runtime_error("ReadCsvFile::apply: unknown value type code");
                     }
-
-                    if (++col >= numCols) {
-                        break;
+                    if (col < numCols - 1) {
+                        while (file->line[pos] != delim)
+                            pos++;
+                        pos++; // skip delimiter
                     }
-
-                    // TODO We could even exploit the fact that the strtoX functions
-                    // can return a pointer to the first character after the parsed
-                    // input, then we wouldn't have to search for that ourselves,
-                    // just would need to check if it is really the delimiter.
-                    while (file->line[pos] != delim)
-                        pos++;
-                    pos++; // skip delimiter
                 }
-
                 currentPos += ret;
-
-                if (++row >= numRows) {
+                if (++row >= numRows)
                     break;
-                }
-                col = 0;
             }
             std::cout << "saving posMap file" << std::endl;
-            if (optimized) {
-                writePositionalMap(filename, posMap);
-            }
+            writePositionalMap(filename, posMap);
         }
         delete[] rawCols;
         delete[] colTypes;
