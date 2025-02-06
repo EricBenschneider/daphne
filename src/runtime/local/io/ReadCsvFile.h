@@ -314,81 +314,80 @@ template <> struct ReadCsvFile<Frame> {
             colTypes[i] = res->getColumnType(i);
         }
         // Use posMap if exists
-        if (optimized && std::filesystem::exists(std::string(filename) + ext)) {
-            std::cout << "try reading posMap file" << std::endl;
+        if (optimized && std::filesystem::exists(std::string(filename) + ".posmap")) {
+            std::cout << "Reading CSV using positional map" << std::endl;
+            // posMap is stored as: posMap[c][r] = absolute offset for column c, row r.
             std::vector<std::vector<std::streampos>> posMap = readPositionalMap(filename, numCols);
-            std::cout << "doing optimized parsing using posMap, numCols: " << numCols
-                      << " numRows: " << numRows << " posMap size: "
-                      << posMap.size() << ", row size: " << (posMap.empty() ? 0 : posMap[0].size()) << std::endl;
-            for (size_t j = 0; j < numRows; j++) {
-                for (size_t i = 0; i < numCols; i++) {
-
-                    file->pos = posMap[j][i];
-                    if (fseek(file->identifier, file->pos, SEEK_SET) != 0)
-                        throw std::runtime_error("Failed to seek to position in file");
-                    if(getFileLine(file) == -1)
-                        //throw std::runtime_error("Optimized branch: getFileLine failed");
-                    std::cout << "row: " << j << " col: " << i << " pos: " << file->pos << std::endl;
-                    size_t pos = 0;
-                    switch (colTypes[i]) {
+            for (size_t r = 0; r < numRows; r++) {
+                // Read the entire row by seeking to the beginning of row r (first field)
+                file->pos = posMap[0][r];
+                if (fseek(file->identifier, file->pos, SEEK_SET) != 0)
+                    throw std::runtime_error("Failed to seek to beginning of row");
+                if (getFileLine(file) == -1)
+                    throw std::runtime_error("Optimized branch: getFileLine failed");
+                // For every column, compute the relative offset within the line
+                for (size_t c = 0; c < numCols; c++) {
+                    size_t relativeOffset = static_cast<size_t>(posMap[c][r] - posMap[0][r]);
+                    size_t pos = relativeOffset;
+                    switch (colTypes[c]) {
                     case ValueTypeCode::SI8: {
-                        int8_t val_si8;
-                        convertCstr(file->line + pos, &val_si8);
-                        reinterpret_cast<int8_t *>(rawCols[i])[j] = val_si8;
+                        int8_t val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<int8_t *>(rawCols[c])[r] = val;
                         break;
                     }
                     case ValueTypeCode::SI32: {
-                        int32_t val_si32;
-                        convertCstr(file->line + pos, &val_si32);
-                        reinterpret_cast<int32_t *>(rawCols[i])[j] = val_si32;
+                        int32_t val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<int32_t *>(rawCols[c])[r] = val;
                         break;
                     }
                     case ValueTypeCode::SI64: {
-                        int64_t val_si64;
-                        convertCstr(file->line + pos, &val_si64);
-                        reinterpret_cast<int64_t *>(rawCols[i])[j] = val_si64;
+                        int64_t val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<int64_t *>(rawCols[c])[r] = val;
                         break;
                     }
                     case ValueTypeCode::UI8: {
-                        uint8_t val_ui8;
-                        convertCstr(file->line + pos, &val_ui8);
-                        reinterpret_cast<uint8_t *>(rawCols[i])[j] = val_ui8;
+                        uint8_t val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<uint8_t *>(rawCols[c])[r] = val;
                         break;
                     }
                     case ValueTypeCode::UI32: {
-                        uint32_t val_ui32;
-                        convertCstr(file->line + pos, &val_ui32);
-                        reinterpret_cast<uint32_t *>(rawCols[i])[j] = val_ui32;
+                        uint32_t val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<uint32_t *>(rawCols[c])[r] = val;
                         break;
                     }
                     case ValueTypeCode::UI64: {
-                        uint64_t val_ui64;
-                        convertCstr(file->line + pos, &val_ui64);
-                        reinterpret_cast<uint64_t *>(rawCols[i])[j] = val_ui64;
+                        uint64_t val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<uint64_t *>(rawCols[c])[r] = val;
                         break;
                     }
                     case ValueTypeCode::F32: {
-                        float val_f32;
-                        convertCstr(file->line + pos, &val_f32);
-                        reinterpret_cast<float *>(rawCols[i])[j] = val_f32;
+                        float val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<float *>(rawCols[c])[r] = val;
                         break;
                     }
                     case ValueTypeCode::F64: {
-                        double val_f64;
-                        convertCstr(file->line + pos, &val_f64);
-                        reinterpret_cast<double *>(rawCols[i])[j] = val_f64;
+                        double val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<double *>(rawCols[c])[r] = val;
                         break;
                     }
                     case ValueTypeCode::STR: {
-                        std::string val_str = "";
-                        pos = setCString(file, pos, &val_str, delim);
-                        reinterpret_cast<std::string *>(rawCols[i])[j] = val_str;
+                        std::string val;
+                        pos = setCString(file, pos, &val, delim);
+                        reinterpret_cast<std::string *>(rawCols[c])[r] = val;
                         break;
                     }
                     case ValueTypeCode::FIXEDSTR16: {
-                        std::string val_str = "";
-                        pos = setCString(file, pos, &val_str, delim);
-                        reinterpret_cast<FixedStr16 *>(rawCols[i])[j] = FixedStr16(val_str);
+                        std::string val;
+                        pos = setCString(file, pos, &val, delim);
+                        reinterpret_cast<FixedStr16 *>(rawCols[c])[r] = FixedStr16(val);
                         break;
                     }
                     default:
@@ -396,100 +395,98 @@ template <> struct ReadCsvFile<Frame> {
                     }
                 }
             }
-            std::cout << "saving posMap file" << std::endl;
         } else {
+            // Normal branch: iterate row by row and for each field save its absolute offset.
             std::vector<std::vector<std::streampos>> posMap(numCols);
             std::streampos currentPos = 0;
-
-            while (true) {
+            size_t row = 0;
+            while (row < numRows && true) {
                 ssize_t ret = getFileLine(file);
-                if (file->read == EOF)
-                    break;
-                if (file->line == NULL)
+                if ((file->read == EOF) || (file->line == NULL))
                     break;
                 if (ret == -1)
                     throw std::runtime_error("ReadCsvFile::apply: getFileLine failed");
-                std::cout << "doing normal parsing saving posMap" << std::endl;
                 size_t pos = 0;
-                for (col = 0; col < numCols; col++) {
-                    if (optimized) {
-                        posMap[col].push_back(currentPos + static_cast<std::streamoff>(pos));
-                    }
-                    switch (colTypes[col]) {
+                // Save offsets for the current row
+                for (size_t c = 0; c < numCols; c++) {
+                    // Record absolute offset of field c
+                    posMap[c].push_back(currentPos + static_cast<std::streamoff>(pos));
+                    // Process cell according to type (same as non-optimized branch):
+                    switch (colTypes[c]) {
                     case ValueTypeCode::SI8: {
-                        int8_t val_si8;
-                        convertCstr(file->line + pos, &val_si8);
-                        reinterpret_cast<int8_t *>(rawCols[col])[row] = val_si8;
+                        int8_t val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<int8_t *>(rawCols[c])[row] = val;
                         break;
                     }
                     case ValueTypeCode::SI32: {
-                        int32_t val_si32;
-                        convertCstr(file->line + pos, &val_si32);
-                        reinterpret_cast<int32_t *>(rawCols[col])[row] = val_si32;
+                        int32_t val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<int32_t *>(rawCols[c])[row] = val;
                         break;
                     }
                     case ValueTypeCode::SI64: {
-                        int64_t val_si64;
-                        convertCstr(file->line + pos, &val_si64);
-                        reinterpret_cast<int64_t *>(rawCols[col])[row] = val_si64;
+                        int64_t val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<int64_t *>(rawCols[c])[row] = val;
                         break;
                     }
                     case ValueTypeCode::UI8: {
-                        uint8_t val_ui8;
-                        convertCstr(file->line + pos, &val_ui8);
-                        reinterpret_cast<uint8_t *>(rawCols[col])[row] = val_ui8;
+                        uint8_t val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<uint8_t *>(rawCols[c])[row] = val;
                         break;
                     }
                     case ValueTypeCode::UI32: {
-                        uint32_t val_ui32;
-                        convertCstr(file->line + pos, &val_ui32);
-                        reinterpret_cast<uint32_t *>(rawCols[col])[row] = val_ui32;
+                        uint32_t val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<uint32_t *>(rawCols[c])[row] = val;
                         break;
                     }
                     case ValueTypeCode::UI64: {
-                        uint64_t val_ui64;
-                        convertCstr(file->line + pos, &val_ui64);
-                        reinterpret_cast<uint64_t *>(rawCols[col])[row] = val_ui64;
+                        uint64_t val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<uint64_t *>(rawCols[c])[row] = val;
                         break;
                     }
                     case ValueTypeCode::F32: {
-                        float val_f32;
-                        convertCstr(file->line + pos, &val_f32);
-                        reinterpret_cast<float *>(rawCols[col])[row] = val_f32;
+                        float val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<float *>(rawCols[c])[row] = val;
                         break;
                     }
                     case ValueTypeCode::F64: {
-                        double val_f64;
-                        convertCstr(file->line + pos, &val_f64);
-                        reinterpret_cast<double *>(rawCols[col])[row] = val_f64;
+                        double val;
+                        convertCstr(file->line + pos, &val);
+                        reinterpret_cast<double *>(rawCols[c])[row] = val;
                         break;
                     }
                     case ValueTypeCode::STR: {
-                        std::string val_str = "";
-                        pos = setCString(file, pos, &val_str, delim);
-                        reinterpret_cast<std::string *>(rawCols[col])[row] = val_str;
+                        std::string val;
+                        pos = setCString(file, pos, &val, delim);
+                        reinterpret_cast<std::string *>(rawCols[c])[row] = val;
                         break;
                     }
                     case ValueTypeCode::FIXEDSTR16: {
-                        std::string val_str = "";
-                        pos = setCString(file, pos, &val_str, delim);
-                        reinterpret_cast<FixedStr16 *>(rawCols[col])[row] = FixedStr16(val_str);
+                        std::string val;
+                        pos = setCString(file, pos, &val, delim);
+                        reinterpret_cast<FixedStr16 *>(rawCols[c])[row] = FixedStr16(val);
                         break;
                     }
                     default:
                         throw std::runtime_error("ReadCsvFile::apply: unknown value type code");
                     }
-                    if (col < numCols - 1) {
-                        while (file->line[pos] != delim)
+                    if (c < numCols - 1) {
+                        // Advance pos until next delimiter
+                        while (file->line[pos] != delim && file->line[pos] != '\0')
                             pos++;
                         pos++; // skip delimiter
                     }
                 }
                 currentPos += ret;
-                if (++row >= numRows)
-                    break;
+                row++;
             }
-            std::cout << "saving posMap file" << std::endl;
+            std::cout << "Saving positional map file" << std::endl;
             writePositionalMap(filename, posMap);
         }
         delete[] rawCols;
