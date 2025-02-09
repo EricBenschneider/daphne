@@ -325,7 +325,7 @@ template <> struct ReadCsvFile<Frame> {
         bool useBin       = false;
         bool usePosMap    = false;
         std::string fName;
-        if (opt.opt_enabled && filename) {
+        if (opt.opt_enabled) {
             fName = filename;
             std::string daphneFile = fName + ".daphne";
             std::string posmapFile = fName + ".posmap";
@@ -338,12 +338,15 @@ template <> struct ReadCsvFile<Frame> {
                 usePosMap = true;
                 fName = posmapFile;
             }
+        }else{
+            opt.posMap = false;
+            opt.saveBin = false;
         }
         if (useOptimized) {
             if (useBin) {
                 try {
                     std::cout << "Reading CSV using binary (.daphne) file: " << fName << std::endl;
-                    readDaphne(res, filename);
+                    readDaphne(res, (std::string(filename)+ ".daphne").c_str());
                     delete[] rawCols;
                     delete[] colTypes;
                     return;
@@ -440,7 +443,7 @@ template <> struct ReadCsvFile<Frame> {
                     }
                 }
                 // After optimized read, save optimization files if not exiting
-                if (opt.saveBin)
+                if (useBin)
                     writeDaphne(res, filename);
 
                 delete[] rawCols;
@@ -450,7 +453,7 @@ template <> struct ReadCsvFile<Frame> {
         }
         // Normal branch: iterate row by row and for each field save its absolute offset.
         std::vector<std::vector<std::streampos>> posMap;
-        if (opt.opt_enabled && opt.posMap) posMap.resize(numCols);
+        if (opt.posMap) posMap.resize(numCols);
         std::streampos currentPos = 0;
         for (size_t row = 0; row < numRows; row++) {
             ssize_t ret = getFileLine(file);
@@ -462,7 +465,7 @@ template <> struct ReadCsvFile<Frame> {
             // Save offsets for the current row
             for (size_t c = 0; c < numCols; c++) {
                 // Record absolute offset of field c
-                if (opt.opt_enabled && opt.posMap) posMap[c].push_back(currentPos + static_cast<std::streamoff>(pos));
+                if (opt.posMap) posMap[c].push_back(currentPos + static_cast<std::streamoff>(pos));
                 // Process cell according to type (same as non-optimized branch):
                 switch (colTypes[c]) {
                 case ValueTypeCode::SI8: {
@@ -541,8 +544,23 @@ template <> struct ReadCsvFile<Frame> {
             std::cout << "Saving optimizations to file" << std::endl;
             if(opt.posMap)
                 writePositionalMap(filename, posMap);
-            if (opt.saveBin)
-                writeDaphne(res, filename);
+            if (opt.saveBin){
+                bool hasString = false;
+                // Check if there are any string columns
+                for (size_t i = 0; i < res->getNumCols(); i++) {
+                    if (static_cast<int>(res->getColumnType(i)) >= 8) {
+                        std::cout << "Cannot save binary file with string columns1" << std::endl;
+                        hasString = true;
+                        break;
+                    }
+                }
+                if (hasString) {
+                    std::cout << "Cannot save binary file with string columns" << std::endl;
+                }else{
+                    std::cout << "Writing binary file" << std::endl;
+                    writeDaphne(res, (std::string(filename) + ".daphne").c_str());
+                }
+            }
         }
         delete[] rawCols;
         delete[] colTypes;
