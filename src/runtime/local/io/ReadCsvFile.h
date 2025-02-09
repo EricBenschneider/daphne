@@ -344,11 +344,14 @@ template <> struct ReadCsvFile<Frame> {
                 usePosMap = true;
                 fName = posmapFile;
             }
+        }else{
+            opt.posMap = false;
+            opt.saveBin = false;
         }
         if (useOptimized) {
             if (useBin) {
                 try {
-                    readDaphne(res, filename);
+                    readDaphne(res, (std::string(filename) + ".daphne").c_str());
                     delete[] rawCols;
                     delete[] colTypes;
                     return;
@@ -435,10 +438,6 @@ template <> struct ReadCsvFile<Frame> {
                         }
                     }
                 }
-                // After optimized read, save optimization files if not exiting
-                if (opt.saveBin)
-                    writeDaphne(res, filename);
-
                 delete[] rawCols;
                 delete[] colTypes;
                 return;
@@ -446,7 +445,7 @@ template <> struct ReadCsvFile<Frame> {
         }
         // Normal branch: iterate row by row and for each field save its absolute offset.
         std::vector<std::vector<std::streampos>> posMap;
-        if (opt.opt_enabled && opt.posMap)
+        if (opt.posMap)
             posMap.resize(numCols);
         std::streampos currentPos = 0;
         for (size_t row = 0; row < numRows; row++) {
@@ -457,7 +456,7 @@ template <> struct ReadCsvFile<Frame> {
                 throw std::runtime_error("ReadCsvFile::apply: getFileLine failed");
             size_t pos = 0;
             for (size_t col = 0; col < numCols; col++) {
-                if (opt.opt_enabled && opt.posMap)
+                if (opt.posMap)
                     posMap[col].push_back(currentPos + static_cast<std::streamoff>(pos));
                 switch (colTypes[col]) {
                 case ValueTypeCode::SI8:
@@ -527,8 +526,19 @@ template <> struct ReadCsvFile<Frame> {
         if (opt.opt_enabled) {
             if (opt.posMap)
                 writePositionalMap(filename, posMap);
-            if (opt.saveBin)
-                writeDaphne(res, filename);
+            if (opt.saveBin){
+                bool hasString = false;
+                // Check if there are any string columns
+                for (size_t i = 0; i < res->getNumCols(); i++) {
+                    if (static_cast<int>(res->getColumnType(i)) >= 8) {
+                        hasString = true;
+                        break;
+                    }
+                }
+                if (!hasString){ //daphnes binary format does not support strings yet
+                    writeDaphne(res, (std::string(filename) + ".daphne").c_str());
+                }
+            }
         }
         delete[] rawCols;
         delete[] colTypes;
