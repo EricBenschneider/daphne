@@ -426,6 +426,8 @@ template <typename VT> struct ReadCsvFile<CSRMatrix<VT>> {
 template <> struct ReadCsvFile<Frame> {
     static void apply(Frame *&res, struct File *file, size_t numRows, size_t numCols, char delim, ValueTypeCode *schema,
                       const char *filename, ReadOpts opt = ReadOpts()) {
+        if (file == nullptr)
+            throw std::runtime_error("ReadCsvFile: requires a file to be specified (must not be nullptr): " + std::string(filename));
         if (numRows <= 0)
             throw std::runtime_error("ReadCsvFile: numRows must be > 0");
         if (numCols <= 0)
