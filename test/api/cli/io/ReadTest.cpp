@@ -15,7 +15,7 @@
  */
 
 #include <api/cli/Utils.h>
-
+#include <parser/metadata/MetaDataParser.h>
 #include <tags.h>
 
 #include <catch.hpp>
@@ -44,6 +44,23 @@ TEST_CASE("readFrameFromCSV", TAG_IO) {
     compareDaphneToRef(dirPath + "testReadFrame.txt", dirPath + "testReadFrame.daphne");
 }
 
+TEST_CASE("readFrameWithNoLabels", TAG_IO){
+        if(std::filesystem::exists(dirPath + "ReadCsv1-1.csv.meta")){
+            std::filesystem::remove(dirPath + "ReadCsv1-1.csv.meta");
+        }
+        compareDaphneToRef(dirPath + "testReadFrameWithNoLabels.txt", dirPath + "testReadFrameWithNoLabels.daphne");
+        REQUIRE(std::filesystem::exists(dirPath + "ReadCsv1-1.csv.meta"));
+        FileMetaData fmd = MetaDataParser::readMetaData(dirPath + "ReadCsv1-1.csv");
+        REQUIRE(fmd.numRows == 2);
+        REQUIRE(fmd.numCols == 4);
+        REQUIRE(fmd.labels.size() == 4);
+        REQUIRE(fmd.labels.size() == fmd.schema.size());
+        for (size_t i = 0; i < fmd.labels.size(); i++) {
+            REQUIRE(fmd.labels[i] == "col" + std::to_string(i));
+            REQUIRE(fmd.schema[i] == ValueTypeCode::F32);
+        }
+        std::filesystem::remove(dirPath + "ReadCsv1-1.csv.meta");
+}
 TEST_CASE("readStringValuesIntoFrameFromCSV", TAG_IO) {
     compareDaphneToRef(dirPath + "testReadStringIntoFrame.txt", dirPath + "testReadStringIntoFrame.daphne");
 }
