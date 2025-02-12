@@ -20,7 +20,6 @@
 
 #include <catch.hpp>
 
-#include <sstream>
 #include <string>
 
 const std::string dirPath = "test/api/cli/io/";
@@ -56,7 +55,7 @@ TEST_CASE("readFrameWithNoLabels", TAG_IO){
         REQUIRE(fmd.labels.size() == 4);
         REQUIRE(fmd.labels.size() == fmd.schema.size());
         for (size_t i = 0; i < fmd.labels.size(); i++) {
-            REQUIRE(fmd.labels[i] == "col" + std::to_string(i));
+            REQUIRE(fmd.labels[i] == "col_" + std::to_string(i));
             REQUIRE(fmd.schema[i] == ValueTypeCode::F32);
         }
         std::filesystem::remove(dirPath + "ReadCsv1-1.csv.meta");
