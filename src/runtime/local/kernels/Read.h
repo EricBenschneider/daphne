@@ -58,15 +58,15 @@ int extValue(const char *filename);
 // ****************************************************************************
 
 template <class DTRes> struct Read {
-    static void apply(DTRes *&res, const char *filename, DCTX(ctx), bool labels = false) = delete;
+    static void apply(DTRes *&res, const char *filename, DCTX(ctx)) = delete;
 };
 
 // ****************************************************************************
 // Convenience function
 // ****************************************************************************
 
-template <class DTRes> void read(DTRes *&res, const char *filename, DCTX(ctx), bool labels = false) {
-    Read<DTRes>::apply(res, filename, ctx, labels);
+template <class DTRes> void read(DTRes *&res, const char *filename, DCTX(ctx)) {
+    Read<DTRes>::apply(res, filename, ctx);
 }
 
 // ****************************************************************************
@@ -78,10 +78,13 @@ template <class DTRes> void read(DTRes *&res, const char *filename, DCTX(ctx), b
 // ----------------------------------------------------------------------------
 
 template <typename VT> struct Read<DenseMatrix<VT>> {
-    static void apply(DenseMatrix<VT> *&res, const char *filename, DCTX(ctx), bool labels = false) {
-
-        ReadOpts read_opt(ctx->getUserConfig().use_second_read_optimization, ctx->getUserConfig().use_positional_map, ctx->getUserConfig().save_csv_as_bin);
-        FileMetaData fmd = MetaDataParser::readMetaData(filename, labels, false);
+    static void apply(DenseMatrix<VT> *&res, const char *filename, DCTX(ctx)) {
+        size_t sampleRows = ctx ? ctx->getUserConfig().numberOfSampleRows : std::numeric_limits<size_t>::max();
+        FileMetaData fmd = MetaDataParser::readMetaData(filename, ',', true, sampleRows);
+        ReadOpts read_opt =
+            ctx ? ReadOpts(ctx->getUserConfig().use_second_read_optimization, ctx->getUserConfig().use_positional_map,
+                           ctx->getUserConfig().save_csv_as_bin)
+                : ReadOpts();
         int extv = extValue(filename);
         switch (extv) {
         case 0:
@@ -132,21 +135,23 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
 // ----------------------------------------------------------------------------
 
 template <typename VT> struct Read<CSRMatrix<VT>> {
-    static void apply(CSRMatrix<VT> *&res, const char *filename, DCTX(ctx), bool labels = false) {
-        ReadOpts read_opt(ctx->getUserConfig().use_second_read_optimization, ctx->getUserConfig().use_positional_map, ctx->getUserConfig().save_csv_as_bin);
-        FileMetaData fmd = MetaDataParser::readMetaData(filename, labels, false);
+    static void apply(CSRMatrix<VT> *&res, const char *filename, DCTX(ctx)) {
+        size_t sampleRows = ctx ? ctx->getUserConfig().numberOfSampleRows : std::numeric_limits<size_t>::max();
+        ReadOpts read_opt =
+            ctx ? ReadOpts(ctx->getUserConfig().use_second_read_optimization, ctx->getUserConfig().use_positional_map,
+                           ctx->getUserConfig().save_csv_as_bin)
+                : ReadOpts();
+        FileMetaData fmd = MetaDataParser::readMetaData(filename, ',', true, sampleRows);
         int extv = extValue(filename);
         switch (extv) {
         case 0:
             if (fmd.numNonZeros == -1)
                 throw std::runtime_error("Currently reading of sparse matrices requires a number of "
                                          "non zeros to be defined");
-
             if (res == nullptr)
                 res = DataObjectFactory::create<CSRMatrix<VT>>(fmd.numRows, fmd.numCols, fmd.numNonZeros, false);
-
             // FIXME: ensure file is sorted, or set `sorted` argument correctly
-            readCsv(res, filename, fmd.numRows, fmd.numCols, ',', fmd.numNonZeros,true,read_opt);
+            readCsv(res, filename, fmd.numRows, fmd.numCols, ',', fmd.numNonZeros, true, read_opt);
             break;
         case 1:
             readMM(res, filename);
@@ -170,9 +175,13 @@ template <typename VT> struct Read<CSRMatrix<VT>> {
 // ----------------------------------------------------------------------------
 
 template <> struct Read<Frame> {
-    static void apply(Frame *&res, const char *filename, DCTX(ctx), bool labels = false) {
-        FileMetaData fmd = MetaDataParser::readMetaData(filename, labels, true);
-        ReadOpts read_opt(ctx->getUserConfig().use_second_read_optimization, ctx->getUserConfig().use_positional_map, ctx->getUserConfig().save_csv_as_bin);
+    static void apply(Frame *&res, const char *filename, DCTX(ctx)) {
+        size_t sampleRows = ctx ? ctx->getUserConfig().numberOfSampleRows : std::numeric_limits<size_t>::max();
+        ReadOpts read_opt =
+            ctx ? ReadOpts(ctx->getUserConfig().use_second_read_optimization, ctx->getUserConfig().use_positional_map,
+                           ctx->getUserConfig().save_csv_as_bin)
+                : ReadOpts();
+        FileMetaData fmd = MetaDataParser::readMetaData(filename, ',', false, sampleRows);
         ValueTypeCode *schema;
         if (fmd.isSingleValueType) {
             schema = new ValueTypeCode[fmd.numCols];
@@ -181,17 +190,14 @@ template <> struct Read<Frame> {
         } else
             schema = fmd.schema.data();
 
-        std::string *fmdLabels;
+        std::string *labels;
         if (fmd.labels.empty())
-            fmdLabels = nullptr;
+            labels = nullptr;
         else
-            fmdLabels = fmd.labels.data();
-
+            labels = fmd.labels.data();
         if (res == nullptr)
-            res = DataObjectFactory::create<Frame>(fmd.numRows, fmd.numCols, schema, fmdLabels, false);
-
+            res = DataObjectFactory::create<Frame>(fmd.numRows, fmd.numCols, schema, labels, false);
         readCsv(res, filename, fmd.numRows, fmd.numCols, ',', schema, read_opt);
-
         if (fmd.isSingleValueType)
             delete[] schema;
     }

@@ -22,18 +22,18 @@
 #include <fstream>
 #include <iostream>
 
-FileMetaData MetaDataParser::readMetaData(const std::string &filename_, bool labels, bool isFrame) {
+FileMetaData MetaDataParser::readMetaData(const std::string &filename_, char delim, bool isMatrix, size_t sampleRows) {
     std::string metaFilename = filename_ + ".meta";
     std::ifstream ifs(metaFilename, std::ios::in);
     if (!ifs.good()) {
         int extv = extValue(&filename_[0]);
-        // TODO: Support other file types than csv
+        // TODO: Support other file types than csv for metadata generation
         if (extv == 0) {
-            FileMetaData fmd = generateFileMetaData(filename_, labels, isFrame);
-            try{
+            FileMetaData fmd = generateFileMetaData(filename_, delim, sampleRows, isMatrix);
+            try {
                 writeMetaData(filename_, fmd);
             } catch (std::exception &e) {
-                std::cerr << "Could not write generated meta data to file '" << metaFilename << "': " << e.what() << std::endl;
+                // If we can't write the meta data, we can still use the generated meta data
             }
             return fmd;
         }

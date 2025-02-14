@@ -17,11 +17,23 @@
 #include <fstream>
 #include <iostream>
 #include <limits>
+#include <runtime/local/datastructures/FixedSizeStringValueType.h>
 #include <runtime/local/io/FileMetaData.h>
 #include <runtime/local/io/utils.h>
 #include <sstream>
 #include <string>
 #include <vector>
+
+// Helper function to trim leading and trailing whitespace.
+static std::string trim(const std::string &s) {
+    size_t start = 0;
+    while (start < s.size() && std::isspace(static_cast<unsigned char>(s[start])))
+        start++;
+    size_t end = s.size();
+    while (end > start && std::isspace(static_cast<unsigned char>(s[end - 1])))
+        end--;
+    return s.substr(start, end - start);
+}
 
 int generality(ValueTypeCode type) { // similar to generality in TypeInferenceUtils.cpp but for ValueTypeCode
     switch (type) {
@@ -48,164 +60,173 @@ int generality(ValueTypeCode type) { // similar to generality in TypeInferenceUt
     }
 }
 
+// Helper function to check if a line is empty or contains only whitespace.
+bool isEmptyLine(const std::string &line) {
+    return std::all_of(line.begin(), line.end(), [](unsigned char c) { return std::isspace(c); });
+}
+
+ValueTypeCode inferValueType(const char *line, size_t &pos, char delim) {
+    std::string field;
+    // Extract field until delimiter
+    while (line[pos] != delim && line[pos] != '\0') {
+        field.push_back(line[pos]);
+        pos++;
+    }
+    // Skip delimiter if present.
+    if (line[pos] == delim)
+        pos++;
+    return inferValueType(field);
+}
+
 // Function to infer the data type of string value
 ValueTypeCode inferValueType(const std::string &valueStr) {
-    // Check if the string represents an integer
+
+    if (valueStr.empty())
+        return ValueTypeCode::STR;
+
+    std::string token;
+    token = trim(valueStr);
+    if (valueStr.front() == '\"') {
+        if (valueStr.back() != '\"')
+            return ValueTypeCode::STR;
+        // Remove the surrounding quotes.
+        token = valueStr.substr(1, valueStr.size() - 2);
+        if (token.size() == 16)
+            return ValueTypeCode::FIXEDSTR16;
+    }
+
+    // Check if the string represents an integer.
     bool isInteger = true;
-    for (char c : valueStr) {
-        if (!isdigit(c) && c != '-' && c != '+' && c != ' ') {
+    for (char c : token) {
+        if (!isdigit(c) && c != '-' && c != '+' && !isspace(c)) {
             isInteger = false;
             break;
         }
     }
-
     if (isInteger) {
         try {
-            int64_t value = std::stoll(valueStr);
-            if (value >= std::numeric_limits<int8_t>::min() && value <= std::numeric_limits<int8_t>::max()) {
-                return ValueTypeCode::SI8;
-            } else if (value >= 0 && value <= std::numeric_limits<uint8_t>::max()) {
-                return ValueTypeCode::UI8;
-            } else if (value >= std::numeric_limits<int32_t>::min() && value <= std::numeric_limits<int32_t>::max()) {
-                return ValueTypeCode::SI32;
-            } else if (value >= 0 && value <= std::numeric_limits<uint32_t>::max()) {
-                return ValueTypeCode::UI32;
-            } else if (value >= std::numeric_limits<int64_t>::min() && value <= std::numeric_limits<int64_t>::max()) {
-                return ValueTypeCode::SI64;
-            } else {
-                return ValueTypeCode::UI64;
+            size_t pos;
+            int64_t value = std::stoll(token, &pos);
+            // ensure there were no extra characters that were silently ignored
+            if (pos == token.size()) {
+                if (value >= std::numeric_limits<int8_t>::min() && value <= std::numeric_limits<int8_t>::max())
+                    return ValueTypeCode::SI8;
+                else if (value >= 0 && value <= std::numeric_limits<uint8_t>::max())
+                    return ValueTypeCode::UI8;
+                else if (value >= std::numeric_limits<int32_t>::min() && value <= std::numeric_limits<int32_t>::max())
+                    return ValueTypeCode::SI32;
+                else if (value >= 0 && value <= std::numeric_limits<uint32_t>::max())
+                    return ValueTypeCode::UI32;
+                else if (value >= std::numeric_limits<int64_t>::min() && value <= std::numeric_limits<int64_t>::max())
+                    return ValueTypeCode::SI64;
+                else
+                    return ValueTypeCode::UI64;
             }
         } catch (const std::invalid_argument &) {
-            // Continue to next check
+            // Fall through to string.
         } catch (const std::out_of_range &) {
             return ValueTypeCode::UI64;
         }
     }
 
-    // Check if the string represents a float
+    // Check if the string represents a float.
     try {
-        float fvalue = std::stof(valueStr);
-        if (fvalue >= std::numeric_limits<float>::lowest() && fvalue <= std::numeric_limits<float>::max()) {
+        size_t pos;
+        float fvalue = std::stof(token, &pos);
+        if (pos == token.size() && fvalue >= std::numeric_limits<float>::lowest() &&
+            fvalue <= std::numeric_limits<float>::max())
             return ValueTypeCode::F32;
-        }
     } catch (const std::invalid_argument &) {
-        // Continue to next check
     } catch (const std::out_of_range &) {
-        // Continue to next check
     }
 
-    // Check if the string represents a double
+    // Check if the string represents a double.
     try {
-        double dvalue = std::stod(valueStr);
-        if (dvalue >= std::numeric_limits<double>::lowest() && dvalue <= std::numeric_limits<double>::max()) {
+        size_t pos;
+        double dvalue = std::stod(token, &pos);
+        if (pos == token.size() && dvalue >= std::numeric_limits<double>::lowest() &&
+            dvalue <= std::numeric_limits<double>::max())
             return ValueTypeCode::F64;
-        }
     } catch (const std::invalid_argument &) {
-        // Continue to next check
     } catch (const std::out_of_range &) {
-        // Continue to next check
     }
 
-    if (valueStr.size() == 16) {
+    if (token.size() == 16)
         return ValueTypeCode::FIXEDSTR16;
-    }
     return ValueTypeCode::STR;
 }
 
 // Function to read the CSV file and determine the FileMetaData
-FileMetaData generateFileMetaData(const std::string &filename, bool hasLabels, bool isFrame) {
+FileMetaData generateFileMetaData(const std::string &filename, char delim, size_t sampleRows, bool isMatrix) {
     std::ifstream file(filename);
+    if (!file.is_open())
+        throw std::runtime_error("Cannot open file: " + filename);
     std::string line;
-    std::vector<ValueTypeCode> schema;
-    std::vector<std::string> labels;
-    size_t numRows = 0;
-    size_t numCols = 0;
-    bool isSingleValueType = false;
-    // set the default value type to the most specific value type
-    ValueTypeCode maxValueType = ValueTypeCode::SI8;
-    ValueTypeCode currentType = ValueTypeCode::INVALID;
+    std::vector<ValueTypeCode> colTypes; // resized once we know numCols
+    bool firstLine = true;
+    size_t row = 0;
+    while (std::getline(file, line) && row < sampleRows) {
+        // Discard empty rows.
+        if (isEmptyLine(line))
+            continue;
 
-    if (file.is_open()) {
-        if (isFrame) {
-            if (hasLabels) {
-                // extract labels from first line
-                if (std::getline(file, line)) {
-                    std::stringstream ss(line);
-                    std::string label;
-                    while (std::getline(ss, label, ',')) {
-                        // trim any whitespaces for last element in line
-                        //  Remove any newline characters from the end of the value
-                        if (!label.empty() && (label.back() == '\n' || label.back() == '\r')) {
-                            label.pop_back();
-                        }
-                        labels.push_back(label);
-                    }
-                }
-            }
-            // Read the rest of the file to infer the schema
-            while (std::getline(file, line)) {
-                std::stringstream ss(line);
-                std::string value;
-                size_t colIndex = 0;
-                while (std::getline(ss, value, ',')) {
-                    // trim any whitespaces for last element in line
-                    //  Remove any newline characters from the end of the value
-                    if (!value.empty() && (value.back() == '\n' || value.back() == '\r')) {
-                        value.pop_back();
-                    }
-                    ValueTypeCode inferredType = inferValueType(value);
-                    std::cout << "inferred valueType: " << static_cast<int>(inferredType) << ", " << value << "."
-                              << std::endl;
-                    // fill empty schema with inferred type
-                    if (numCols <= colIndex) {
-                        schema.push_back(inferredType);
-                    }
-                    currentType = schema[colIndex];
-                    // update the current type if the inferred type is more specific
-                    if (generality(currentType) < generality(inferredType)) {
-                        currentType = inferredType;
-                        schema[colIndex] = currentType;
-                    }
-                    if (generality(maxValueType) < generality(currentType)) {
-                        maxValueType = currentType;
-                    }
-                    colIndex++;
-                }
-                numCols = std::max(numCols, colIndex);
-                numRows++;
-            }
-            file.close();
-        } else { // matrix
-            while (std::getline(file, line)) {
-                std::stringstream ss(line);
-                std::string value;
-                size_t colIndex = 0;
-                while (std::getline(ss, value, ',')) {
-                    if (!value.empty() && (value.back() == '\n' || value.back() == '\r')) {
-                        value.pop_back();
-                    }
-                    ValueTypeCode inferredType = inferValueType(value);
-                    if (generality(maxValueType) < generality(inferredType)) {
-                        maxValueType = inferredType;
-                    }
-                    colIndex++;
-                }
-                numCols = std::max(numCols, colIndex);
-                numRows++;
-            }
-            schema.clear();
-            schema.push_back(maxValueType);
-            isSingleValueType = true;
+        // If a token may span multiple lines, join subsequent lines until quotes match.
+        size_t quoteCount = std::count(line.begin(), line.end(), '\"');
+        while ((quoteCount % 2) != 0) {
+            std::string nextLine;
+            if (!std::getline(file, nextLine))
+                break;
+            line += "\n" + nextLine;
+            quoteCount = std::count(line.begin(), line.end(), '\"');
         }
-        file.close();
-    } else {
-        std::cerr << "Unable to open file: " << filename << std::endl;
+
+        size_t pos = 0;
+        size_t col = 0;
+        // On first non-empty line, determine number of columns.
+        if (firstLine) {
+            size_t ncols = 1;
+            for (char c : line)
+                if (c == delim)
+                    ncols++;
+            colTypes.resize(ncols, ValueTypeCode::SI8); // start with narrow type.
+            firstLine = false;
+        }
+        // Process each token.
+        while (pos < line.size() && col < colTypes.size()) {
+            size_t tempPos = pos;
+            // Extract token using the existing inferValueType helper.
+            ValueTypeCode tokenType = inferValueType(line.c_str(), tempPos, delim);
+            // Promote type if needed.
+            if (generality(tokenType) > generality(colTypes[col]))
+                colTypes[col] = tokenType;
+            pos = tempPos;
+            col++;
+        }
+        row++;
     }
+    file.close();
 
-    return FileMetaData(numRows, numCols, isSingleValueType, schema, labels);
+    std::vector<std::string> labels;
+    size_t numCols = colTypes.size();
+    bool isSingleValueType = true;
+    ValueTypeCode firstValueType = colTypes[0];
+    ValueTypeCode maxValueType = colTypes[0];
+    for (size_t i = 0; i < numCols; i++) {
+        labels.push_back("col_" + std::to_string(i));
+        if (generality(colTypes[i]) > generality(maxValueType))
+            maxValueType = colTypes[i];
+        if (colTypes[i] != firstValueType)
+            isSingleValueType = false;
+    }
+    if (isSingleValueType) {
+        colTypes.clear();
+        labels.clear();
+        colTypes.push_back(maxValueType);
+    }
+    if (isMatrix)
+        return FileMetaData(row, numCols, true, {maxValueType}, {});
+    return FileMetaData(row, numCols, isSingleValueType, colTypes, labels);
 }
-
-//create positional map based on csv data
 
 // Function save the positional map
 void writePositionalMap(const char *filename, const std::vector<std::vector<std::streampos>> &posMap) {
@@ -213,7 +234,7 @@ void writePositionalMap(const char *filename, const std::vector<std::vector<std:
     if (!posMapFile.is_open()) {
         throw std::runtime_error("Failed to open positional map file");
     }
-
+    
     for (const auto &colPositions : posMap) {
         for (const auto &pos : colPositions) {
             posMapFile.write(reinterpret_cast<const char *>(&pos), sizeof(pos));

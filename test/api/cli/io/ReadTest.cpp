@@ -15,12 +15,11 @@
  */
 
 #include <api/cli/Utils.h>
-
+#include <parser/metadata/MetaDataParser.h>
 #include <tags.h>
 
 #include <catch.hpp>
 
-#include <sstream>
 #include <string>
 
 const std::string dirPath = "test/api/cli/io/";
@@ -42,6 +41,39 @@ TEST_CASE("readSparse", TAG_IO) {
 
 TEST_CASE("readFrameFromCSV", TAG_IO) {
     compareDaphneToRef(dirPath + "testReadFrame.txt", dirPath + "testReadFrame.daphne");
+}
+
+TEST_CASE("readFrameWithSingleValueType", TAG_IO) {
+    if (std::filesystem::exists(dirPath + "ReadCsv1-1.csv.meta")) {
+        std::filesystem::remove(dirPath + "ReadCsv1-1.csv.meta");
+    }
+    compareDaphneToRef(dirPath + "testReadFrameWithNoMeta.txt", dirPath + "testReadFrameWithNoMeta.daphne");
+    REQUIRE(std::filesystem::exists(dirPath + "ReadCsv1-1.csv.meta"));
+    FileMetaData fmd = MetaDataParser::readMetaData(dirPath + "ReadCsv1-1.csv");
+    REQUIRE(fmd.numRows == 2);
+    REQUIRE(fmd.numCols == 4);
+    REQUIRE(fmd.labels.empty());
+    REQUIRE(fmd.schema.size() == 1);
+    REQUIRE(fmd.schema[0] == ValueTypeCode::F32);
+
+    std::filesystem::remove(dirPath + "ReadCsv1-1.csv.meta");
+}
+
+TEST_CASE("readFrameWithMixedType", TAG_IO) {
+    if (std::filesystem::exists(dirPath + "ReadCsv3-1.csv.meta")) {
+        std::filesystem::remove(dirPath + "ReadCsv3-1.csv.meta");
+    }
+    compareDaphneToRef(dirPath + "testReadStringIntoFrameNoMeta.txt", dirPath + "testReadFrameWithMixedTypes.daphne");
+    REQUIRE(std::filesystem::exists(dirPath + "ReadCsv3-1.csv.meta"));
+    FileMetaData fmd = MetaDataParser::readMetaData(dirPath + "ReadCsv3-1.csv");
+    REQUIRE(fmd.numRows == 4);
+    REQUIRE(fmd.numCols == 3);
+    REQUIRE(fmd.labels.size() == 3);
+    REQUIRE(fmd.labels.size() == fmd.schema.size());
+    for (size_t i = 0; i < fmd.labels.size(); i++) {
+        REQUIRE(fmd.labels[i] == "col_" + std::to_string(i));
+    }
+    std::filesystem::remove(dirPath + "ReadCsv3-1.csv.meta");
 }
 
 TEST_CASE("readStringValuesIntoFrameFromCSV", TAG_IO) {

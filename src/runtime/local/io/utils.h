@@ -25,11 +25,13 @@
 
 #include <runtime/local/io/FileMetaData.h>
 
+ValueTypeCode inferValueType(const char *line, size_t &pos, char delim);
+
 // Function to infer the data type of string value
 ValueTypeCode inferValueType(const std::string &value);
 
 // Function to read the CSV file and determine the FileMetaData
-FileMetaData generateFileMetaData(const std::string &filename, bool hasLabels, bool isFrame);
+FileMetaData generateFileMetaData(const std::string &filename, char delim, size_t sampleRows, bool isMatrix = false);
 
 // Function to create and save the positional map
 void writePositionalMap(const char *filename, const std::vector<std::vector<std::streampos>> &posMap);

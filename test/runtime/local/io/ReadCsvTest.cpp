@@ -177,12 +177,9 @@ TEST_CASE("ReadCsv, frame of floats using positional map", "[TAG_IO][posMap]") {
     if(std::filesystem::exists(filename+std::string(".posmap"))) {
         std::filesystem::remove(filename + std::string(".posmap"));
     }
-    std::cout << "first csv read" << std::endl;
     readCsv(m_new, filename, numRows, numCols, delim, schema, ReadOpts(true,true,false));
-    std::cout << "first csv read done" << std::endl;
     REQUIRE(std::filesystem::exists(filename+std::string(".posmap")));
     readCsv(m, filename, numRows, numCols, delim, schema, ReadOpts(true,true,false));
-    std::cout << "second csv read done" << std::endl;
 
     REQUIRE(m->getNumRows() == numRows);
     REQUIRE(m->getNumCols() == numCols);
