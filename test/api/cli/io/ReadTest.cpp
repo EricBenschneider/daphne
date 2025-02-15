@@ -43,6 +43,12 @@ TEST_CASE("readFrameFromCSV", TAG_IO) {
     compareDaphneToRef(dirPath + "testReadFrame.txt", dirPath + "testReadFrame.daphne");
 }
 
+TEST_CASE("readFrameFromCSVOptimized", TAG_IO) {
+    
+    std::filesystem::remove(dirPath + "ReadCsv1-1.csv.meta");
+    compareDaphneToRef(dirPath + "testReadFrame.txt", dirPath + "testReadFrame.daphne", "--second-read-opt");
+}
+
 TEST_CASE("readFrameWithSingleValueType", TAG_IO) {
     if (std::filesystem::exists(dirPath + "ReadCsv1-1.csv.meta")) {
         std::filesystem::remove(dirPath + "ReadCsv1-1.csv.meta");
@@ -77,7 +83,7 @@ TEST_CASE("readFrameWithMixedType", TAG_IO) {
 }
 
 TEST_CASE("readStringValuesIntoFrameFromCSV", TAG_IO) {
-    compareDaphneToRef(dirPath + "testReadStringIntoFrame.txt", dirPath + "testReadStringIntoFrame.daphne");
+    compareDaphneToRef(dirPath + "testReadStringIntoFrame.txt", dirPath + "testReadStringIntoFrame.daphne", "--second-read-opt");
 }
 
 TEST_CASE("readMatrixFromCSV", TAG_IO) {
