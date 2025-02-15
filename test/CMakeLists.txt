@@ -37,6 +37,7 @@ set(TEST_SOURCES
         api/cli/import/ImportTest.cpp
         api/cli/indexing/IndexingTest.cpp
         api/cli/inference/InferenceTest.cpp
+        api/cli/io/ReadOptimizationEvaluation.cpp
         api/cli/io/ReadTest.cpp
         api/cli/lists/ListsTest.cpp
         api/cli/literals/LiteralsTest.cpp
