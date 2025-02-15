@@ -44,7 +44,7 @@ TEST_CASE("readFrameFromCSV", TAG_IO) {
 }
 
 TEST_CASE("readFrameFromCSVBinOpt", TAG_IO) {
-    std::string filename = dirPath + "testReadFrame.txt";
+    std::string filename = dirPath + "ReadCsv1.csv";
     std::filesystem::remove(filename + ".posmap");
     std::filesystem::remove(filename + ".dbdf");
     compareDaphneToRef(dirPath + "testReadFrame.txt", dirPath + "testReadFrame.daphne", "--second-read-opt");
@@ -57,7 +57,7 @@ TEST_CASE("readFrameFromCSVBinOpt", TAG_IO) {
 }
 
 TEST_CASE("readFrameFromCSVPosMap", TAG_IO) {
-    std::string filename = dirPath + "testReadFrame.txt";
+    std::string filename = dirPath + "ReadCsv1.csv";
     std::filesystem::remove(filename + ".posmap");
     std::filesystem::remove(filename + ".dbdf");
     compareDaphneToRef(dirPath + "testReadFrame.txt", dirPath + "testReadFrame.daphne", "--second-read-opt");
@@ -107,7 +107,7 @@ TEST_CASE("readStringValuesIntoFrameFromCSV", TAG_IO) {
 }
 
 TEST_CASE("readStringValuesIntoFrameFromCSVPosMap", TAG_IO) {
-    std::string filename = dirPath + "testReadStringIntoFrame.txt";
+    std::string filename = dirPath + "ReadCsv3.csv";
     std::filesystem::remove(filename + ".posmap");
     std::filesystem::remove(filename + ".dbdf");
     compareDaphneToRef(dirPath + "testReadStringIntoFrame.txt", dirPath + "testReadStringIntoFrame.daphne", "--second-read-opt");
@@ -123,7 +123,7 @@ TEST_CASE("readMatrixFromCSV", TAG_IO) {
 }
 
 TEST_CASE("readMatrixFromCSVBinOpt", TAG_IO) {
-        std::string filename = dirPath + "testReadMatrix.txt";
+        std::string filename = dirPath + "ReadCsv1.csv";
         std::filesystem::remove(filename + ".posmap");
         std::filesystem::remove(filename + ".dbdf");
         compareDaphneToRef(dirPath + "testReadMatrix.txt", dirPath + "testReadMatrix.daphne", "--second-read-opt");
@@ -136,7 +136,7 @@ TEST_CASE("readMatrixFromCSVBinOpt", TAG_IO) {
 }
 
 TEST_CASE("readMatrixFromCSVPosMap", TAG_IO) {
-    std::string filename = dirPath + "testReadMatrix.txt";
+    std::string filename = dirPath + "ReadCsv1.csv";
     std::filesystem::remove(filename + ".posmap");
     std::filesystem::remove(filename + ".dbdf");
     compareDaphneToRef(dirPath + "testReadMatrix.txt", dirPath + "testReadMatrix.daphne", "--second-read-opt");
@@ -153,7 +153,7 @@ TEST_CASE("readStringMatrixFromCSV", TAG_IO) {
 }
 
 TEST_CASE("readStringMatrixFromCSVPosMap", TAG_IO) {
-    std::string filename = dirPath + "testReadStringMatrix.txt";
+    std::string filename = dirPath + "ReadCsv2.csv";
     std::filesystem::remove(filename + ".posmap");
     std::filesystem::remove(filename + ".dbdf");
     compareDaphneToRef(dirPath + "testReadStringMatrix.txt", dirPath + "testReadStringMatrix.daphne", "--second-read-opt");
