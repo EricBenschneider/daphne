@@ -593,18 +593,22 @@ template <> struct ReadCsvFile<Frame> {
                 }
             } else if (usePosMap) {
                 // posMap is stored as: posMap[c][r] = absolute offset for column c, row r.
-                std::vector<std::vector<std::streampos>> posMap = readPositionalMap(filename, numCols);
+                std::vector<std::vector<uint16_t>> relPosMap;
+                std::vector<uint32_t> rowStartMap;
+                std::pair <std::vector<uint32_t>, std::vector<std::vector<uint16_t>>> posMap = readRelativePosMap(filename, numRows, numCols);
+                rowStartMap = posMap.first;
+                relPosMap = posMap.second;
+                
                 for (size_t r = 0; r < numRows; r++) {
                     // Read the entire row by seeking to the beginning of row r (first field)
-                    file->pos = posMap[0][r];
                     if (fseek(file->identifier, file->pos, SEEK_SET) != 0)
                         throw std::runtime_error("Failed to seek to beginning of row");
                     if (getFileLine(file) == -1)
                         throw std::runtime_error("Optimized branch: getFileLine failed");
+                    size_t position = rowStartMap[r];
                     // For every column, compute the relative offset within the line
                     for (size_t c = 0; c < numCols; c++) {
-                        size_t relativeOffset = static_cast<size_t>(posMap[c][r] - posMap[0][r]);
-                        size_t pos = relativeOffset;
+                        size_t pos = position;
                         switch (colTypes[c]) {
                         case ValueTypeCode::SI8: {
                             int8_t val;
@@ -669,28 +673,47 @@ template <> struct ReadCsvFile<Frame> {
                         default:
                             throw std::runtime_error("ReadCsvFile::apply: unknown value type code");
                         }
+                        position = pos + relPosMap[c][r];
                     }
                 }
+                if (opt.saveBin)
+                    try{
+                        writeDaphne(res, getDaphneFile(filename).c_str());
+                    } catch (std::exception &e) {
+                        // read data can still be used
+                    }
                 delete[] rawCols;
                 delete[] colTypes;
                 return;
             }
         }
         // Normal branch: iterate row by row and for each field save its absolute offset.
-        std::vector<std::vector<std::streampos>> posMap;
-        if (opt.posMap)
-            posMap.resize(numCols);
-        std::streampos currentPos = 0;
+        std::vector<uint32_t> rowStartMap; 
+        std::vector<std::vector<uint16_t>> relPosMap; // relative offsets per column (col0 is dummy: always 0)
+        if (opt.posMap){
+            // absolute row start for each row
+            rowStartMap.resize(numRows);
+                // relative offsets for each column
+            relPosMap.resize(numCols);
+        }
+        std::streampos colPos = 0;
         for (size_t row = 0; row < numRows; row++) {
             ssize_t ret = getFileLine(file);
             if ((file->read == EOF) || (file->line == NULL))
                 break;
             if (ret == -1)
                 throw std::runtime_error("ReadCsvFile::apply: getFileLine failed");
+            if (opt.posMap)
+                rowStartMap[row] = static_cast<uint32_t>(colPos);
+            
+            // Compute starting positions for all fields in this row (relative to the start of the line)
+            std::vector<uint16_t> fieldStarts;
+            if (opt.posMap)
+                    fieldStarts.resize(numCols, 0);
             size_t pos = 0;
             for (size_t col = 0; col < numCols; col++) {
                 if (opt.posMap)
-                    posMap[col].push_back(currentPos + static_cast<std::streamoff>(pos));
+                    fieldStarts[col] = pos-colPos;
                 switch (colTypes[col]) {
                 case ValueTypeCode::SI8:
                     int8_t val_si8;
@@ -754,12 +777,13 @@ template <> struct ReadCsvFile<Frame> {
                     pos++; // skip delimiter
                 }
             }
-            currentPos += ret;
+            relPosMap[row]=fieldStarts;
+            colPos= pos;
         }
         if (opt.opt_enabled) {
             if (opt.posMap)
                 try{
-                    writePositionalMap(filename, posMap);
+                    writeRelativePosMap(filename, rowStartMap, relPosMap);
                 } catch (std::exception &e) {
                     // positional map can still be used
                 }
