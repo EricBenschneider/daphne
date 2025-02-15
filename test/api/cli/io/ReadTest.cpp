@@ -43,11 +43,30 @@ TEST_CASE("readFrameFromCSV", TAG_IO) {
     compareDaphneToRef(dirPath + "testReadFrame.txt", dirPath + "testReadFrame.daphne");
 }
 
-TEST_CASE("readFrameFromCSVOptimized", TAG_IO) {
+TEST_CASE("readFrameFromCSVBinOpt", TAG_IO) {
     std::string filename = dirPath + "testReadFrame.txt";
     std::filesystem::remove(filename + ".posmap");
     std::filesystem::remove(filename + ".dbdf");
     compareDaphneToRef(dirPath + "testReadFrame.txt", dirPath + "testReadFrame.daphne", "--second-read-opt");
+    REQUIRE(std::filesystem::exists(filename + ".posmap"));
+    REQUIRE(std::filesystem::exists(filename + ".dbdf"));
+    std::filesystem::remove(filename + ".posmap");
+    compareDaphneToRef(dirPath + "testReadFrame.txt", dirPath + "testReadFrame.daphne", "--second-read-opt");
+    std::filesystem::remove(filename + ".posmap");
+    std::filesystem::remove(filename + ".dbdf");
+}
+
+TEST_CASE("readFrameFromCSVPosMap", TAG_IO) {
+    std::string filename = dirPath + "testReadFrame.txt";
+    std::filesystem::remove(filename + ".posmap");
+    std::filesystem::remove(filename + ".dbdf");
+    compareDaphneToRef(dirPath + "testReadFrame.txt", dirPath + "testReadFrame.daphne", "--second-read-opt");
+    REQUIRE(std::filesystem::exists(filename + ".posmap"));
+    REQUIRE(std::filesystem::exists(filename + ".dbdf"));
+    std::filesystem::remove(filename + ".dbdf");
+    compareDaphneToRef(dirPath + "testReadFrame.txt", dirPath + "testReadFrame.daphne", "--second-read-opt");
+    std::filesystem::remove(filename + ".posmap");
+    std::filesystem::remove(filename + ".dbdf");
 }
 
 TEST_CASE("readFrameWithSingleValueType", TAG_IO) {
@@ -84,15 +103,65 @@ TEST_CASE("readFrameWithMixedType", TAG_IO) {
 }
 
 TEST_CASE("readStringValuesIntoFrameFromCSV", TAG_IO) {
+    compareDaphneToRef(dirPath + "testReadStringIntoFrame.txt", dirPath + "testReadStringIntoFrame.daphne");
+}
+
+TEST_CASE("readStringValuesIntoFrameFromCSVPosMap", TAG_IO) {
+    std::string filename = dirPath + "testReadStringIntoFrame.txt";
+    std::filesystem::remove(filename + ".posmap");
+    std::filesystem::remove(filename + ".dbdf");
     compareDaphneToRef(dirPath + "testReadStringIntoFrame.txt", dirPath + "testReadStringIntoFrame.daphne", "--second-read-opt");
+    REQUIRE(std::filesystem::exists(filename + ".posmap"));
+    REQUIRE(!std::filesystem::exists(filename + ".dbdf"));
+    compareDaphneToRef(dirPath + "testReadStringIntoFrame.txt", dirPath + "testReadStringIntoFrame.daphne", "--second-read-opt");
+    std::filesystem::remove(filename + ".posmap");
+    std::filesystem::remove(filename + ".dbdf");
 }
 
 TEST_CASE("readMatrixFromCSV", TAG_IO) {
     compareDaphneToRef(dirPath + "testReadMatrix.txt", dirPath + "testReadMatrix.daphne");
 }
 
+TEST_CASE("readMatrixFromCSVBinOpt", TAG_IO) {
+        std::string filename = dirPath + "testReadMatrix.txt";
+        std::filesystem::remove(filename + ".posmap");
+        std::filesystem::remove(filename + ".dbdf");
+        compareDaphneToRef(dirPath + "testReadMatrix.txt", dirPath + "testReadMatrix.daphne", "--second-read-opt");
+        REQUIRE(std::filesystem::exists(filename + ".posmap"));
+        REQUIRE(std::filesystem::exists(filename + ".dbdf"));
+        std::filesystem::remove(filename + ".posmap");
+        compareDaphneToRef(dirPath + "testReadMatrix.txt", dirPath + "testReadMatrix.daphne", "--second-read-opt");
+        std::filesystem::remove(filename + ".posmap");
+        std::filesystem::remove(filename + ".dbdf");
+}
+
+TEST_CASE("readMatrixFromCSVPosMap", TAG_IO) {
+    std::string filename = dirPath + "testReadMatrix.txt";
+    std::filesystem::remove(filename + ".posmap");
+    std::filesystem::remove(filename + ".dbdf");
+    compareDaphneToRef(dirPath + "testReadMatrix.txt", dirPath + "testReadMatrix.daphne", "--second-read-opt");
+    REQUIRE(std::filesystem::exists(filename + ".posmap"));
+    REQUIRE(std::filesystem::exists(filename + ".dbdf"));
+    std::filesystem::remove(filename + ".dbdf");
+    compareDaphneToRef(dirPath + "testReadMatrix.txt", dirPath + "testReadMatrix.daphne", "--second-read-opt");
+    std::filesystem::remove(filename + ".posmap");
+    std::filesystem::remove(filename + ".dbdf");
+}
+
 TEST_CASE("readStringMatrixFromCSV", TAG_IO) {
     compareDaphneToRef(dirPath + "testReadStringMatrix.txt", dirPath + "testReadStringMatrix.daphne");
+}
+
+TEST_CASE("readStringMatrixFromCSVPosMap", TAG_IO) {
+    std::string filename = dirPath + "testReadStringMatrix.txt";
+    std::filesystem::remove(filename + ".posmap");
+    std::filesystem::remove(filename + ".dbdf");
+    compareDaphneToRef(dirPath + "testReadStringMatrix.txt", dirPath + "testReadStringMatrix.daphne", "--second-read-opt");
+    REQUIRE(std::filesystem::exists(filename + ".posmap"));
+    REQUIRE(!std::filesystem::exists(filename + ".dbdf"));
+    compareDaphneToRef(dirPath + "testReadStringMatrix.txt", dirPath + "testReadStringMatrix.daphne", "--second-read-opt");
+    std::filesystem::remove(filename + ".posmap");
+    std::filesystem::remove(filename + ".dbdf");
 }
 
 // does not yet work!
