@@ -229,53 +229,58 @@ FileMetaData generateFileMetaData(const std::string &filename, char delim, size_
 }
 
 // Function save the positional map
-void writePositionalMap(const char* filename, const std::vector<std::vector<std::streampos>> &posMap) {
-    std::ofstream ofs(getPosMapFile(filename), std::ios::binary);
+void writePositionalMap(const char* filename, 
+                        const std::vector<std::pair<std::streampos, std::vector<std::uint32_t>>>& posMap) {
+    
+    std::string posMapFile = getPosMapFile(filename);
+    std::ofstream ofs(posMapFile, std::ios::binary);
     if (!ofs.good())
-        throw std::runtime_error("Cannot open file for writing posMap");
-    size_t numRows = posMap[0].size();
-    size_t numCols = posMap.size();
+        throw std::runtime_error("Unable to open positional map file for writing: " + posMapFile);
+    
+    // Write the number of rows.
+    size_t numRows = posMap.size();
     ofs.write(reinterpret_cast<const char*>(&numRows), sizeof(numRows));
+    
+    // For each row, we expect (numCols = relative offsets count + 1) columns.
+    size_t numCols = (numRows == 0 ? 0 : posMap[0].second.size() + 1);
     ofs.write(reinterpret_cast<const char*>(&numCols), sizeof(numCols));
-    // Write full absolute offsets for col 0.
-    for (size_t r = 0; r < numRows; r++) {
-        auto offset = posMap[0][r];
-        ofs.write(reinterpret_cast<const char*>(&offset), sizeof(offset));
-    }
-    // Write relative offsets for cols > 0.
-    for (size_t c = 1; c < numCols; c++) {
-        for (size_t r = 0; r < numRows; r++) {
-            int32_t rel = static_cast<int32_t>(posMap[c][r] - posMap[0][r]);
-            ofs.write(reinterpret_cast<const char*>(&rel), sizeof(rel));
+    
+    // Write for each row:
+    // - the absolute offset (base)
+    // - follow by (numCols - 1) relative offsets stored as uint32_t.
+    for (const auto& row : posMap) {
+        ofs.write(reinterpret_cast<const char*>(&row.first), sizeof(row.first));
+        for (uint32_t offset : row.second) {
+            ofs.write(reinterpret_cast<const char*>(&offset), sizeof(uint32_t));
         }
     }
+    ofs.close();
 }
 
 // Updated readPositionalMap: reconstruct full offsets.
-std::vector<std::vector<std::streampos>> readPositionalMap(const char* filename, size_t numCols) {
+std::vector<std::pair<std::streampos, std::vector<uint32_t>>>
+readPositionalMap(const char* filename) {
     std::ifstream ifs(getPosMapFile(filename), std::ios::binary);
     if (!ifs.good())
         throw std::runtime_error("Cannot open posMap file");
-    size_t numRows;
-    size_t colsStored;
+    
+    size_t numRows, numCols;
     ifs.read(reinterpret_cast<char*>(&numRows), sizeof(numRows));
-    ifs.read(reinterpret_cast<char*>(&colsStored), sizeof(colsStored));
-    if (colsStored != numCols)
-        throw std::runtime_error("posMap file: stored number of columns does not match");
-    std::vector<std::vector<std::streampos>> posMap(numCols, std::vector<std::streampos>(numRows));
-    // Read column 0 absolute offsets.
+    ifs.read(reinterpret_cast<char*>(&numCols), sizeof(numCols));
+    
+    std::vector<std::pair<std::streampos, std::vector<uint32_t>>> posMap;
+    posMap.resize(numRows);
+    // For each row, read the base offset and the relative offsets.
     for (size_t r = 0; r < numRows; r++) {
-        std::streampos offset;
-        ifs.read(reinterpret_cast<char*>(&offset), sizeof(offset));
-        posMap[0][r] = offset;
-    }
-    // Read each column c > 0 relative offsets and reconstruct full offsets.
-    for (size_t c = 1; c < numCols; c++) {
-        for (size_t r = 0; r < numRows; r++) {
-            int32_t rel;
+        std::streampos base;
+        ifs.read(reinterpret_cast<char*>(&base), sizeof(base));
+        std::vector<uint32_t> relOffsets(numCols - 1);
+        for (size_t c = 0; c < numCols - 1; c++) {
+            uint32_t rel;
             ifs.read(reinterpret_cast<char*>(&rel), sizeof(rel));
-            posMap[c][r] = posMap[0][r] + rel;
+            relOffsets[c] = rel;
         }
+        posMap[r] = std::make_pair(base, relOffsets);
     }
     return posMap;
 }
