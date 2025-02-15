@@ -44,8 +44,9 @@ TEST_CASE("readFrameFromCSV", TAG_IO) {
 }
 
 TEST_CASE("readFrameFromCSVOptimized", TAG_IO) {
-    
-    std::filesystem::remove(dirPath + "ReadCsv1-1.csv.meta");
+    std::string filename = dirPath + "testReadFrame.txt";
+    std::filesystem::remove(filename + ".posmap");
+    std::filesystem::remove(filename + ".dbdf");
     compareDaphneToRef(dirPath + "testReadFrame.txt", dirPath + "testReadFrame.daphne", "--second-read-opt");
 }
 
