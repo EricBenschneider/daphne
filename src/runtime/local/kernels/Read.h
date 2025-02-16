@@ -82,8 +82,7 @@ template <typename VT> struct Read<DenseMatrix<VT>> {
         size_t sampleRows = ctx ? ctx->getUserConfig().numberOfSampleRows : std::numeric_limits<size_t>::max();
         FileMetaData fmd = MetaDataParser::readMetaData(filename, ',', true, sampleRows);
         ReadOpts read_opt =
-            ctx ? ReadOpts(ctx->getUserConfig().use_second_read_optimization, ctx->getUserConfig().use_positional_map,
-                           ctx->getUserConfig().save_csv_as_bin)
+            ctx ? ReadOpts(ctx->getUserConfig().use_second_read_optimization, ctx->getUserConfig().use_positional_map)
                 : ReadOpts();
         int extv = extValue(filename);
         switch (extv) {
@@ -138,8 +137,7 @@ template <typename VT> struct Read<CSRMatrix<VT>> {
     static void apply(CSRMatrix<VT> *&res, const char *filename, DCTX(ctx)) {
         size_t sampleRows = ctx ? ctx->getUserConfig().numberOfSampleRows : std::numeric_limits<size_t>::max();
         ReadOpts read_opt =
-            ctx ? ReadOpts(ctx->getUserConfig().use_second_read_optimization, ctx->getUserConfig().use_positional_map,
-                           ctx->getUserConfig().save_csv_as_bin)
+            ctx ? ReadOpts(ctx->getUserConfig().use_second_read_optimization, ctx->getUserConfig().use_positional_map)
                 : ReadOpts();
         FileMetaData fmd = MetaDataParser::readMetaData(filename, ',', true, sampleRows);
         int extv = extValue(filename);
@@ -178,8 +176,7 @@ template <> struct Read<Frame> {
     static void apply(Frame *&res, const char *filename, DCTX(ctx)) {
         size_t sampleRows = ctx ? ctx->getUserConfig().numberOfSampleRows : std::numeric_limits<size_t>::max();
         ReadOpts read_opt =
-            ctx ? ReadOpts(ctx->getUserConfig().use_second_read_optimization, ctx->getUserConfig().use_positional_map,
-                           ctx->getUserConfig().save_csv_as_bin)
+            ctx ? ReadOpts(ctx->getUserConfig().use_second_read_optimization, ctx->getUserConfig().use_positional_map)
                 : ReadOpts();
         FileMetaData fmd = MetaDataParser::readMetaData(filename, ',', false, sampleRows);
         ValueTypeCode *schema;
