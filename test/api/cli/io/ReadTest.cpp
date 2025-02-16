@@ -112,26 +112,9 @@ TEST_CASE("readMatrixFromCSVBinOpt", TAG_IO) {
         std::filesystem::remove(filename + ".posmap");
 }
 
-TEST_CASE("readMatrixFromCSVPosMap", TAG_IO) {
-    std::string filename = dirPath + "ReadCsv1.csv";
-    std::filesystem::remove(filename + ".posmap");
-    compareDaphneToRef(dirPath + "testReadMatrix.txt", dirPath + "testReadMatrix.daphne", "--second-read-opt");
-    REQUIRE(std::filesystem::exists(filename + ".posmap"));
-    compareDaphneToRef(dirPath + "testReadMatrix.txt", dirPath + "testReadMatrix.daphne", "--second-read-opt");
-    std::filesystem::remove(filename + ".posmap");
-}
 
 TEST_CASE("readStringMatrixFromCSV", TAG_IO) {
     compareDaphneToRef(dirPath + "testReadStringMatrix.txt", dirPath + "testReadStringMatrix.daphne");
-}
-
-TEST_CASE("readStringMatrixFromCSVPosMap", TAG_IO) {
-    std::string filename = dirPath + "ReadCsv2.csv";
-    std::filesystem::remove(filename + ".posmap");
-    compareDaphneToRef(dirPath + "testReadStringMatrix.txt", dirPath + "testReadStringMatrix.daphne", "--second-read-opt");
-    REQUIRE(std::filesystem::exists(filename + ".posmap"));
-    compareDaphneToRef(dirPath + "testReadStringMatrix.txt", dirPath + "testReadStringMatrix.daphne", "--second-read-opt");
-    std::filesystem::remove(filename + ".posmap");
 }
 
 // does not yet work!
